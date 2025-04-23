@@ -1,0 +1,36 @@
+{
+  "name": "node-grocy",
+  "version": "0.1.0",
+  "main": "index.mjs",
+  "type": "module",
+  "scripts": {
+    "test": "node --test index.test.mjs"
+  },
+  "keywords": [
+    "grocy",
+    "api",
+    "client",
+    "wrapper",
+    "groceries",
+    "erp",
+    "household-management"
+  ],
+  "author": {
+    "name": "Democratize Technology",
+    "email": "hello@democratize.technology",
+    "url": "https://democratize.technology"
+  },
+  "license": "MIT",
+  "description": "A JavaScript wrapper for the Grocy REST API",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/democratize-technology/node-grocy.git"
+  },
+  "bugs": {
+    "url": "https://github.com/democratize-technology/node-grocy/issues"
+  },
+  "homepage": "https://github.com/democratize-technology/node-grocy#readme",
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
