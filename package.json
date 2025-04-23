@@ -31,6 +31,6 @@
   },
   "homepage": "https://github.com/democratize-technology/node-grocy#readme",
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=20.0.0"
   }
 }
