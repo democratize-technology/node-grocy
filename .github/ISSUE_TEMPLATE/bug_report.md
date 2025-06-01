@@ -19,17 +19,9 @@ Steps to reproduce the behavior:
 **Expected behavior**
 A clear and concise description of what you expected to happen.
 
-**Code Example**
-```javascript
-// Add a minimal code example that demonstrates the issue
-const grocy = new Grocy('https://example.com', 'api-key');
-const result = await grocy.someMethod();
-```
-
 **Environment (please complete the following information):**
  - Node.js version: [e.g. 16.14.0]
  - Package version: [e.g. 0.1.0]
- - Grocy version: [e.g. 3.3.0]
 
 **Additional context**
 Add any other context about the problem here.

@@ -29,8 +29,14 @@ Thumbs.db
 dist/
 build/
 
+# NPM package files
+*.tgz
+
 # IDE files
 .idea/
 .vscode/
 *.swp
 *.swo
+
+# Claude Code directory
+.claude/

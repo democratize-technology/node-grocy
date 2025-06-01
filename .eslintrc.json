@@ -1,0 +1,84 @@
+{
+  "root": true,
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:functional/external-recommended",
+    "plugin:functional/recommended"
+  ],
+  "plugins": [
+    "@typescript-eslint",
+    "functional"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "module",
+    "project": "./tsconfig.json"
+  },
+  "rules": {
+    "functional/immutable-data": "error",
+    "functional/no-let": "error",
+    "functional/no-method-signature": "warn",
+    "functional/prefer-readonly-type": "error",
+    "functional/no-this-expression": "error",
+    "functional/no-class": "warn",
+    "functional/no-mixed-type": "error",
+    "functional/prefer-immutable-types": ["error", {
+      "enforcement": "ReadonlyDeep",
+      "ignoreInferredTypes": false
+    }],
+    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/explicit-function-return-type": "error",
+    "@typescript-eslint/no-non-null-assertion": "error",
+    "@typescript-eslint/strict-boolean-expressions": "error",
+    "no-console": "error",
+    "no-debugger": "error",
+    "no-alert": "error",
+    "prefer-const": "error",
+    "no-var": "error",
+    "eqeqeq": ["error", "always"],
+    "curly": ["error", "all"],
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "CallExpression[callee.property.name='push']",
+        "message": "Array.push mutates. Use spread operator [...arr, item] instead."
+      },
+      {
+        "selector": "CallExpression[callee.property.name='pop']",
+        "message": "Array.pop mutates. Use arr.slice(0, -1) instead."
+      },
+      {
+        "selector": "CallExpression[callee.property.name='shift']",
+        "message": "Array.shift mutates. Use arr.slice(1) instead."
+      },
+      {
+        "selector": "CallExpression[callee.property.name='unshift']",
+        "message": "Array.unshift mutates. Use [item, ...arr] instead."
+      },
+      {
+        "selector": "CallExpression[callee.property.name='splice']",
+        "message": "Array.splice mutates. Use filter() or slice() instead."
+      },
+      {
+        "selector": "CallExpression[callee.property.name='sort']",
+        "message": "Array.sort mutates. Use [...arr].sort() instead."
+      },
+      {
+        "selector": "CallExpression[callee.property.name='reverse']",
+        "message": "Array.reverse mutates. Use [...arr].reverse() instead."
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["*.test.ts", "*.test.mjs"],
+      "rules": {
+        "functional/no-let": "off",
+        "functional/immutable-data": "off",
+        "@typescript-eslint/no-explicit-any": "off"
+      }
+    }
+  ]
+}
