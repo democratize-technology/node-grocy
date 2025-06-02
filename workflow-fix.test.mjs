@@ -83,7 +83,7 @@ function analyzeWorkflowFile(filePath) {
   // Extract only actual workflow commands, not heredoc content
   const lines = content.split('\n');
   let inHeredoc = false;
-  const workflowLines = [];
+  let workflowLines = Object.freeze([]);
   
   for (const line of lines) {
     // Track heredoc boundaries
@@ -96,9 +96,9 @@ function analyzeWorkflowFile(filePath) {
       continue;
     }
     
-    // Only include non-heredoc lines
+    // Only include non-heredoc lines (immutable update)
     if (!inHeredoc) {
-      workflowLines.push(line);
+      workflowLines = Object.freeze([...workflowLines, line]);
     }
   }
   
