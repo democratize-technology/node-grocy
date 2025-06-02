@@ -26,6 +26,8 @@
 - ❌ Merging without approval
 - ❌ "Quick fixes" directly to integration branch
 - ❌ Pushing broken code that fails GitHub Actions
+- ❌ **Force adding ignored files with `git add -f`** - respect `.gitignore` rules
+- ❌ **Committing `.claude/` directory contents** - keep local configs local
 
 **Violation of these rules will result in branch protection enforcement and loss of direct push privileges.**
 
