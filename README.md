@@ -23,6 +23,42 @@ node-grocy is a comprehensive client library for interacting with [Grocy](https:
 npm install node-grocy
 ```
 
+## Development
+
+### Git Hooks
+
+This project uses pre-commit hooks to ensure code quality and prevent broken code from being committed:
+
+- **ESLint**: Enforces immutability rules and code quality standards
+- **Prettier**: Automatically formats code for consistency
+- **Tests**: Ensures all tests pass before committing
+
+The hooks run automatically on every commit and will:
+
+1. Lint and auto-fix staged JavaScript/TypeScript files
+2. Format staged JSON, Markdown, and YAML files
+3. Run the full test suite to ensure nothing is broken
+
+#### Bypassing Hooks (Emergency Only)
+
+In rare cases where you need to commit without running hooks:
+
+```bash
+git commit --no-verify -m "emergency fix"
+```
+
+**⚠️ Use sparingly**: This bypasses all quality checks and may introduce bugs.
+
+#### Troubleshooting
+
+If hooks fail:
+
+1. Fix any ESLint errors shown in the output
+2. Ensure all tests pass with `npm test`
+3. Check that your code follows immutability principles (no mutations)
+
+The hooks automatically install when you run `npm install` via the `prepare` script.
+
 ## Usage
 
 ```javascript
@@ -48,7 +84,7 @@ async function addProduct(productId) {
       amount: 1,
       best_before_date: '2023-12-31',
       transaction_type: 'purchase',
-      price: 2.99
+      price: 2.99,
     };
     // productId is automatically validated as positive integer
     // data.amount is automatically validated as positive number
@@ -136,7 +172,7 @@ grocy.getProductByBarcode(''); // Error: Barcode must be a non-empty string
 All API responses are now immutable and follow consistent patterns:
 
 ```javascript
-const stock = await grocy.getStock(); 
+const stock = await grocy.getStock();
 // stock is now Object.freeze()'d - cannot be modified
 
 const result = await grocy.uploadFile(group, fileName, data);
