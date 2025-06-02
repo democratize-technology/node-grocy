@@ -197,7 +197,7 @@ jobs:
             
             try {
               // Simple HTTP request test
-              const response = await fetch(\`\${config.baseUrl}/api/products\`);
+              const response = await fetch(`${config.baseUrl}/api/products`);
               await response.json();
               
               const duration = performance.now() - start;
@@ -230,7 +230,7 @@ jobs:
           
           try {
             const promises = Array.from({ length: concurrency }, async (_, i) => {
-              const response = await fetch(\`\${config.baseUrl}/api/stock\`);
+              const response = await fetch(`${config.baseUrl}/api/stock`);
               return response.json();
             });
             
@@ -266,7 +266,7 @@ jobs:
           // Perform multiple operations to test memory handling
           for (let i = 0; i < 20; i++) {
             try {
-              const response = await fetch(\`\${config.baseUrl}/api/products\`);
+              const response = await fetch(`${config.baseUrl}/api/products`);
               await response.json();
             } catch (e) {
               // Continue testing even if some requests fail
@@ -301,12 +301,12 @@ jobs:
             const fs = await import('fs');
             fs.writeFileSync('performance-results.json', JSON.stringify(results, null, 2));
             
-            console.log(\`\nSummary:
-            - Average latency: \${results.summary.avgLatency.toFixed(2)}ms
-            - Max latency: \${results.summary.maxLatency.toFixed(2)}ms
-            - Min latency: \${results.summary.minLatency.toFixed(2)}ms
-            - Total requests: \${results.summary.totalRequests}
-            - Errors: \${results.summary.errorsCount}\`);
+            console.log(`\nSummary:
+            - Average latency: ${results.summary.avgLatency.toFixed(2)}ms
+            - Max latency: ${results.summary.maxLatency.toFixed(2)}ms
+            - Min latency: ${results.summary.minLatency.toFixed(2)}ms
+            - Total requests: ${results.summary.totalRequests}
+            - Errors: ${results.summary.errorsCount}`);
           })
           .catch(error => {
             console.error('Performance test failed:', error);
@@ -351,7 +351,7 @@ jobs:
               metric: 'avgLatency',
               current: current.avgLatency,
               threshold: thresholds.avgLatency,
-              message: \`Average latency \${current.avgLatency.toFixed(2)}ms exceeds threshold \${thresholds.avgLatency}ms\`
+              message: `Average latency ${current.avgLatency.toFixed(2)}ms exceeds threshold ${thresholds.avgLatency}ms`
             });
           }
           
@@ -360,7 +360,7 @@ jobs:
               metric: 'maxLatency',
               current: current.maxLatency,
               threshold: thresholds.maxLatency,
-              message: \`Max latency \${current.maxLatency.toFixed(2)}ms exceeds threshold \${thresholds.maxLatency}ms\`
+              message: `Max latency ${current.maxLatency.toFixed(2)}ms exceeds threshold ${thresholds.maxLatency}ms`
             });
           }
           
@@ -369,7 +369,7 @@ jobs:
               metric: 'errorRate',
               current: errorRate,
               threshold: thresholds.errorRate,
-              message: \`Error rate \${(errorRate * 100).toFixed(2)}% exceeds threshold \${(thresholds.errorRate * 100)}%\`
+              message: `Error rate ${(errorRate * 100).toFixed(2)}% exceeds threshold ${(thresholds.errorRate * 100)}%`
             });
           }
           
@@ -392,14 +392,14 @@ jobs:
         const comparison = comparePerformance();
         
         console.log('Performance Comparison Results:');
-        console.log(\`Status: \${comparison.status}\`);
-        console.log(\`Average Latency: \${comparison.summary.avgLatency.toFixed(2)}ms\`);
-        console.log(\`Max Latency: \${comparison.summary.maxLatency.toFixed(2)}ms\`);
-        console.log(\`Error Rate: \${comparison.summary.errorRate.toFixed(2)}%\`);
+        console.log(`Status: ${comparison.status}`);
+        console.log(`Average Latency: ${comparison.summary.avgLatency.toFixed(2)}ms`);
+        console.log(`Max Latency: ${comparison.summary.maxLatency.toFixed(2)}ms`);
+        console.log(`Error Rate: ${comparison.summary.errorRate.toFixed(2)}%`);
         
         if (comparison.violations.length > 0) {
           console.log('\nPerformance Violations:');
-          comparison.violations.forEach(v => console.log(\`  - \${v.message}\`));
+          comparison.violations.forEach(v => console.log(`  - ${v.message}`));
         }
         
         if (comparison.hasRegression) {
