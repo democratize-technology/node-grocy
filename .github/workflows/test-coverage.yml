@@ -38,11 +38,15 @@ jobs:
         # Run tests with c8 coverage
         npx c8 --reporter=text --reporter=lcov --reporter=json-summary npm test
         
-        # Store coverage percentage in environment
-        COVERAGE=$(npx c8 report --reporter=json-summary | jq '.total.lines.pct')
-        echo "COVERAGE_PERCENTAGE=$COVERAGE" >> $GITHUB_ENV
-        
-        echo "Current coverage: $COVERAGE%"
+        # Store coverage percentage in environment from the json-summary
+        if [ -f "coverage/coverage-summary.json" ]; then
+          COVERAGE=$(jq '.total.lines.pct' coverage/coverage-summary.json)
+          echo "COVERAGE_PERCENTAGE=$COVERAGE" >> $GITHUB_ENV
+          echo "Current coverage: $COVERAGE%"
+        else
+          echo "COVERAGE_PERCENTAGE=0" >> $GITHUB_ENV
+          echo "Warning: No coverage data generated"
+        fi
 
     - name: Check Coverage Threshold
       run: |
@@ -73,8 +77,14 @@ jobs:
       run: |
         echo "📊 Generating detailed coverage report..."
         
-        # Create detailed HTML report
-        npx c8 report --reporter=html --reports-dir=coverage/html
+        # Create detailed HTML report (only if coverage data exists)
+        if [ -d "coverage" ] && [ "$(ls -A coverage 2>/dev/null)" ]; then
+          npx c8 report --reporter=html --reports-dir=coverage/html || echo "HTML report generation skipped"
+        else
+          echo "No coverage data available for HTML report"
+          mkdir -p coverage/html
+          echo "<html><body><h1>No Coverage Data</h1><p>Coverage data not available</p></body></html>" > coverage/html/index.html
+        fi
         
         # Create markdown summary
         cat > coverage-summary.md << 'EOF'

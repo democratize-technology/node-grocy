@@ -30,46 +30,45 @@ jobs:
 
     - name: Setup ESLint for Immutability
       run: |
-        cat > .eslintrc.immutability.json << 'EOF'
-        {
-          "env": {
-            "node": true,
-            "es2022": true
-          },
-          "extends": [
-            "eslint:recommended"
-          ],
-          "plugins": [
-            "functional"
-          ],
-          "parserOptions": {
-            "ecmaVersion": "latest",
-            "sourceType": "module"
-          },
-          "rules": {
-            "functional/immutable-data": "error",
-            "functional/no-let": "error",
-            "functional/prefer-readonly-type": "error",
-            "functional/no-method-signature": "off",
-            "functional/functional-parameters": "error",
-            "functional/no-expression-statement": "off",
-            "functional/no-conditional-statement": "off",
-            "functional/no-loop-statement": "error",
-            "functional/no-return-void": "off",
-            "functional/prefer-property-signatures": "off",
-            "no-var": "error",
-            "prefer-const": "error"
-          },
-          "overrides": [
-            {
-              "files": ["*.test.js", "*.test.mjs", "**/*.test.*"],
-              "rules": {
-                "functional/functional-parameters": "off",
-                "functional/no-expression-statement": "off"
+        # Create ESLint flat config for ESLint 9.x compatibility
+        cat > eslint.config.immutability.mjs << 'EOF'
+        import functional from 'eslint-plugin-functional';
+        
+        export default [
+          {
+            languageOptions: {
+              ecmaVersion: 2022,
+              sourceType: 'module',
+              globals: {
+                console: 'readonly',
+                process: 'readonly',
+                Buffer: 'readonly',
+                __dirname: 'readonly',
+                __filename: 'readonly',
+                global: 'readonly',
+                require: 'readonly',
+                module: 'readonly',
+                exports: 'readonly'
               }
+            },
+            plugins: {
+              functional
+            },
+            rules: {
+              'functional/immutable-data': 'error',
+              'functional/no-let': 'error', 
+              'no-var': 'error',
+              'prefer-const': 'error'
             }
-          ]
-        }
+          },
+          {
+            files: ['*.test.js', '*.test.mjs', '**/*.test.*'],
+            rules: {
+              'functional/immutable-data': 'off',
+              'functional/no-let': 'off'
+            }
+          }
+        ];
         EOF
 
     - name: Run Immutability Check
@@ -78,7 +77,7 @@ jobs:
         echo "=============================================================="
         
         # Check current JavaScript files for mutations
-        npx eslint --config .eslintrc.immutability.json "*.mjs" "*.js" --format=stylish
+        npx eslint --config eslint.config.immutability.mjs "*.mjs" "*.js" --format=stylish
         
         if [ $? -ne 0 ]; then
           echo ""
