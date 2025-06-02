@@ -132,14 +132,15 @@ jobs:
         cat > performance-test.mjs << 'EOF'
         import { performance } from 'perf_hooks';
         
-        // Import the node-grocy client
+        // Import the node-grocy client using ES module syntax
         let GrocyClient;
         try {
           // Try to import from built version first, then fallback to source
-          GrocyClient = require('./dist/index.js').default || require('./index.mjs').default;
+          const distModule = await import('./dist/index.js').catch(() => null);
+          const srcModule = await import('./index.mjs').catch(() => null);
+          GrocyClient = distModule?.default || srcModule?.default;
         } catch (e) {
-          // Fallback to dynamic import for ES modules
-          console.log('Using dynamic import for ES modules...');
+          console.log('Could not import GrocyClient, using fetch for direct API calls');
         }
         
         async function runPerformanceTests() {
@@ -295,9 +296,10 @@ jobs:
         
         // Run tests and save results
         runPerformanceTests()
-          .then(results => {
+          .then(async results => {
             console.log('Performance test results:', JSON.stringify(results, null, 2));
-            require('fs').writeFileSync('performance-results.json', JSON.stringify(results, null, 2));
+            const fs = await import('fs');
+            fs.writeFileSync('performance-results.json', JSON.stringify(results, null, 2));
             
             console.log(\`\nSummary:
             - Average latency: \${results.summary.avgLatency.toFixed(2)}ms
