@@ -37,6 +37,7 @@ jobs:
 
     - name: Extract Current API Surface
       run: |
+        set -euo pipefail
         echo "🔍 Extracting current API surface from codebase..."
         
         # Create API extraction script
@@ -116,6 +117,7 @@ jobs:
 
     - name: Get Base Branch API
       run: |
+        set -euo pipefail
         echo "📥 Getting base branch API for comparison..."
         
         # Checkout base branch
@@ -133,6 +135,7 @@ jobs:
 
     - name: Compare API Compatibility
       run: |
+        set -euo pipefail
         echo "🔍 Comparing API compatibility..."
         
         # Create comparison script
@@ -199,6 +202,7 @@ jobs:
 
     - name: Check for Breaking Changes
       run: |
+        set -euo pipefail
         echo "🚨 Checking for breaking changes..."
         
         # Read comparison results

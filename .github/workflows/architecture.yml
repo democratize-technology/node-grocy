@@ -37,6 +37,7 @@ jobs:
 
     - name: Analyze Service Architecture
       run: |
+        set -euo pipefail
         echo "🏗️ Analyzing service architecture for node-grocy v1.0.0..."
         
         # Create architecture analysis script
@@ -178,6 +179,7 @@ jobs:
 
     - name: Check Dependency Injection Patterns
       run: |
+        set -euo pipefail
         echo "💉 Checking dependency injection patterns..."
         
         cat > check-di.js << 'EOF'
@@ -281,6 +283,7 @@ jobs:
 
     - name: Detect Circular Dependencies
       run: |
+        set -euo pipefail
         echo "🔄 Checking for circular dependencies..."
         
         # Use madge if available, otherwise simple check
@@ -307,6 +310,7 @@ jobs:
 
     - name: Validate Service Boundaries
       run: |
+        set -euo pipefail
         echo "🏭 Validating service boundaries..."
         
         cat > validate-boundaries.js << 'EOF'
@@ -489,6 +493,7 @@ jobs:
 
     - name: Check Architecture Violations
       run: |
+        set -euo pipefail
         # Fail if there are critical architecture violations
         ERRORS=$(node -pe "
         try {

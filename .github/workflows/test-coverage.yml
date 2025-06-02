@@ -1,9 +1,12 @@
 name: Test Coverage
 
 on:
-  push:
-    branches: [ main, feature/v1-refactoring ]
   pull_request:
+    branches: [ main, feature/v1-refactoring ]
+  workflow_run:
+    workflows: ["Node.js CI"]
+    types:
+      - completed
     branches: [ main, feature/v1-refactoring ]
 
 permissions:
@@ -13,6 +16,9 @@ permissions:
 jobs:
   coverage:
     runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'pull_request' ||
+      (github.event.workflow_run.conclusion == 'success')
     
     steps:
     - uses: actions/checkout@v4

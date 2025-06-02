@@ -249,6 +249,7 @@ jobs:
         node extract-api-docs.js
 
     - name: Generate TypeScript Documentation
+      timeout-minutes: 10
       run: |
         echo "📘 Generating TypeScript documentation..."
         
@@ -293,6 +294,7 @@ jobs:
         fi
 
     - name: Generate Current API Documentation
+      timeout-minutes: 5
       run: |
         echo "📝 Generating current JavaScript API documentation..."
         

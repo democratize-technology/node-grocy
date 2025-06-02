@@ -36,7 +36,9 @@ jobs:
         npm list clinic || npm install --save-dev clinic@latest
 
     - name: Setup Performance Test Environment
+      timeout-minutes: 10
       run: |
+        set -euo pipefail
         echo "⚡ Setting up performance benchmark environment..."
         
         # Create mock Grocy server for testing
@@ -121,7 +123,9 @@ jobs:
         echo "✅ Mock Grocy server started successfully"
 
     - name: Run Baseline Performance Tests
+      timeout-minutes: 15
       run: |
+        set -euo pipefail
         echo "📊 Running baseline performance benchmarks..."
         
         # Create performance test script
@@ -539,6 +543,16 @@ jobs:
             repo: context.repo.repo,
             body: comment
           });
+
+    - name: Cleanup Mock Server
+      if: always()
+      run: |
+        echo "🧹 Cleaning up mock server..."
+        # Kill any processes running on port 3000
+        pkill -f "node mock-grocy-server.js" || echo "No mock server process found"
+        # Alternative cleanup method
+        lsof -ti:3000 | xargs kill -9 2>/dev/null || echo "Port 3000 is free"
+        echo "✅ Cleanup completed"
 
     - name: Cache Performance Data
       uses: actions/cache@v4

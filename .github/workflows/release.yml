@@ -66,6 +66,7 @@ jobs:
 
     - name: Run comprehensive test suite
       run: |
+        set -euo pipefail
         echo "🧪 Running comprehensive test suite..."
         npm test
         
@@ -73,6 +74,7 @@ jobs:
 
     - name: Run immutability checks
       run: |
+        set -euo pipefail
         echo "🚨 Running immutability validation..."
         
         # Install ESLint if not available
@@ -108,6 +110,7 @@ jobs:
 
     - name: Security audit
       run: |
+        set -euo pipefail
         echo "🛡️ Running security audit..."
         npm audit --audit-level=high || {
           echo "❌ High-severity security vulnerabilities detected!"
@@ -117,6 +120,7 @@ jobs:
 
     - name: Build artifacts
       run: |
+        set -euo pipefail
         echo "🔨 Building release artifacts..."
         
         # If TypeScript build exists, run it
