@@ -46,7 +46,7 @@ jobs:
         npm ci
         # Install documentation tools
         npm list typedoc || npm install --save-dev typedoc@latest
-        npm list @typedoc/plugin-markdown || npm install --save-dev @typedoc/plugin-markdown@latest
+        npm list "@typedoc/plugin-markdown" || npm install --save-dev "@typedoc/plugin-markdown@latest"
         npm list jsdoc || npm install --save-dev jsdoc@latest
 
     - name: Setup Documentation Environment
