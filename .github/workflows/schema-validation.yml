@@ -168,9 +168,9 @@ jobs:
         echo "🔧 Validating schema compilation..."
         
         # Create schema validation script
-        cat > validate-schemas.js << 'EOF'
-        const fs = require('fs');
-        const path = require('path');
+        cat > validate-schemas.mjs << 'EOF'
+        import fs from 'fs';
+        import path from 'path';
         
         async function validateSchemas() {
           const results = {
@@ -379,15 +379,15 @@ jobs:
         });
         EOF
         
-        node validate-schemas.js
+        node validate-schemas.mjs
 
     - name: Test Schema Coverage
       run: |
         echo "📊 Testing schema coverage against Grocy API..."
         
         # Create coverage analysis script
-        cat > analyze-coverage.js << 'EOF'
-        const fs = require('fs');
+        cat > analyze-coverage.mjs << 'EOF'
+        import fs from 'fs';
         
         function analyzeGrocySchemaCoverage() {
           // Expected Grocy API entities based on specification
@@ -460,7 +460,7 @@ jobs:
         analyzeGrocySchemaCoverage();
         EOF
         
-        node analyze-coverage.js
+        node analyze-coverage.mjs
 
     - name: Generate Schema Documentation
       run: |
@@ -476,47 +476,31 @@ jobs:
         
         EOF
         
-        # Add validation results
-        node -pe "
-        let results, coverage;
-        try { results = JSON.parse(require('fs').readFileSync('schema-validation-results.json', 'utf8')); } catch(e) { results = {}; }
-        try { coverage = JSON.parse(require('fs').readFileSync('schema-coverage.json', 'utf8')); } catch(e) { coverage = {}; }
-        
-        let summary = \`| Metric | Value |\n|--------|-------|\n\`;
-        summary += \`| **Schema Files** | \${results.schemasFound || 0} |\n\`;
-        summary += \`| **Valid Schemas** | \${results.summary?.validSchemas || 0} |\n\`;
-        summary += \`| **Compilation Errors** | \${results.compilationErrors?.length || 0} |\n\`;
-        summary += \`| **Validation Errors** | \${results.validationErrors?.length || 0} |\n\`;
-        summary += \`| **API Coverage** | \${coverage.percentage || 0}% |\n\`;
-        summary += \`| **Runtime Tests** | \${results.runtimeTests?.passed || 0} passed, \${results.runtimeTests?.failed || 0} failed |\n\`;
-        
-        console.log(summary);
-        " >> schema-report.md
+        # Add validation results using jq
+        echo "| Metric | Value |" >> schema-report.md
+        echo "|--------|-------|" >> schema-report.md
+        echo "| **Schema Files** | $(jq '.schemasFound // 0' schema-validation-results.json 2>/dev/null || echo 0) |" >> schema-report.md
+        echo "| **Valid Schemas** | $(jq '.summary.validSchemas // 0' schema-validation-results.json 2>/dev/null || echo 0) |" >> schema-report.md
+        echo "| **Compilation Errors** | $(jq '.compilationErrors | length // 0' schema-validation-results.json 2>/dev/null || echo 0) |" >> schema-report.md
+        echo "| **Validation Errors** | $(jq '.validationErrors | length // 0' schema-validation-results.json 2>/dev/null || echo 0) |" >> schema-report.md
+        echo "| **API Coverage** | $(jq '.percentage // 0' schema-coverage.json 2>/dev/null || echo 0)% |" >> schema-report.md
+        PASSED_TESTS=$(jq '.runtimeTests.passed // 0' schema-validation-results.json 2>/dev/null || echo 0)
+        FAILED_TESTS=$(jq '.runtimeTests.failed // 0' schema-validation-results.json 2>/dev/null || echo 0)
+        echo "| **Runtime Tests** | $PASSED_TESTS passed, $FAILED_TESTS failed |" >> schema-report.md
         
         echo "" >> schema-report.md
         echo "## Grocy API Coverage" >> schema-report.md
         echo "" >> schema-report.md
         
         # Add coverage details
-        COVERAGE_PERCENTAGE=$(node -pe "
-        try {
-          const coverage = JSON.parse(require('fs').readFileSync('schema-coverage.json', 'utf8'));
-          console.log(coverage.percentage);
-        } catch(e) {
-          console.log('0');
-        }")
+        COVERAGE_PERCENTAGE=$(jq -r '.percentage // 0' schema-coverage.json 2>/dev/null || echo 0)
         
         if [ "$COVERAGE_PERCENTAGE" -lt 80 ]; then
           echo "⚠️ **Schema coverage is below 80%**" >> schema-report.md
           echo "" >> schema-report.md
           echo "Missing schemas for the following Grocy API entities:" >> schema-report.md
           echo "" >> schema-report.md
-          node -pe "
-          try {
-            const coverage = JSON.parse(require('fs').readFileSync('schema-coverage.json', 'utf8'));
-            coverage.missingEntities.forEach(entity => console.log(\`- \${entity}\`));
-          } catch(e) {}
-          " >> schema-report.md
+          jq -r '.missingEntities[]? | "- " + .' schema-coverage.json 2>/dev/null >> schema-report.md || true
         else
           echo "✅ **Schema coverage is adequate** (≥80%)" >> schema-report.md
         fi
@@ -526,25 +510,12 @@ jobs:
         echo "" >> schema-report.md
         
         # Add compilation errors if any
-        COMPILATION_ERRORS=$(node -pe "
-        try {
-          const results = JSON.parse(require('fs').readFileSync('schema-validation-results.json', 'utf8'));
-          console.log(results.compilationErrors.length);
-        } catch(e) {
-          console.log('0');
-        }")
+        COMPILATION_ERRORS=$(jq '.compilationErrors | length // 0' schema-validation-results.json 2>/dev/null || echo 0)
         
         if [ "$COMPILATION_ERRORS" -gt 0 ]; then
           echo "### ❌ Compilation Errors" >> schema-report.md
           echo "" >> schema-report.md
-          node -pe "
-          try {
-            const results = JSON.parse(require('fs').readFileSync('schema-validation-results.json', 'utf8'));
-            results.compilationErrors.forEach(error => {
-              console.log(\`- **\${error.file}**: \${error.error}\`);
-            });
-          } catch(e) {}
-          " >> schema-report.md
+          jq -r '.compilationErrors[]? | "- **" + .file + "**: " + .error' schema-validation-results.json 2>/dev/null >> schema-report.md || true
           echo "" >> schema-report.md
         fi
         
@@ -561,29 +532,11 @@ jobs:
         echo "🎯 Checking schema quality gates..."
         
         # Read validation results
-        COMPILATION_ERRORS=$(node -pe "
-        try {
-          const results = JSON.parse(require('fs').readFileSync('schema-validation-results.json', 'utf8'));
-          console.log(results.compilationErrors.length);
-        } catch(e) {
-          console.log('0');
-        }")
+        COMPILATION_ERRORS=$(jq '.compilationErrors | length // 0' schema-validation-results.json 2>/dev/null || echo 0)
         
-        VALIDATION_ERRORS=$(node -pe "
-        try {
-          const results = JSON.parse(require('fs').readFileSync('schema-validation-results.json', 'utf8'));
-          console.log(results.validationErrors.length);
-        } catch(e) {
-          console.log('0');
-        }")
+        VALIDATION_ERRORS=$(jq '.validationErrors | length // 0' schema-validation-results.json 2>/dev/null || echo 0)
         
-        COVERAGE_PERCENTAGE=$(node -pe "
-        try {
-          const coverage = JSON.parse(require('fs').readFileSync('schema-coverage.json', 'utf8'));
-          console.log(coverage.percentage);
-        } catch(e) {
-          console.log('0');
-        }")
+        COVERAGE_PERCENTAGE=$(jq '.percentage // 0' schema-coverage.json 2>/dev/null || echo 0)
         
         # Quality gates
         QUALITY_ISSUES=0

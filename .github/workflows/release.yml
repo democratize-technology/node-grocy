@@ -52,7 +52,7 @@ jobs:
 
     - name: Validate version consistency
       run: |
-        PACKAGE_VERSION=$(node -pe "require('./package.json').version")
+        PACKAGE_VERSION=$(jq -r '.version' package.json)
         TAG_VERSION="${{ steps.get-version.outputs.version }}"
         
         if [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
