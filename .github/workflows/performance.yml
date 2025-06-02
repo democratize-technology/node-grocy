@@ -430,17 +430,17 @@ jobs:
         
         # Average Latency
         AVG_LATENCY=$(jq -r '.summary.avgLatency // 0' performance-comparison.json 2>/dev/null || echo 0)
-        AVG_STATUS=$(echo "$AVG_LATENCY < 500" | bc -l | grep -q 1 && echo "✅" || echo "❌")
+        AVG_STATUS=$([ "$(echo "$AVG_LATENCY < 500" | bc -l)" = "1" ] && echo "✅" || echo "❌")
         echo "| **Average Latency** | ${AVG_LATENCY}ms | $AVG_STATUS |" >> performance-report.md
         
         # Max Latency
         MAX_LATENCY=$(jq -r '.summary.maxLatency // 0' performance-comparison.json 2>/dev/null || echo 0)
-        MAX_STATUS=$(echo "$MAX_LATENCY < 2000" | bc -l | grep -q 1 && echo "✅" || echo "❌")
+        MAX_STATUS=$([ "$(echo "$MAX_LATENCY < 2000" | bc -l)" = "1" ] && echo "✅" || echo "❌")
         echo "| **Max Latency** | ${MAX_LATENCY}ms | $MAX_STATUS |" >> performance-report.md
         
         # Error Rate
         ERROR_RATE=$(jq -r '.summary.errorRate // 0' performance-comparison.json 2>/dev/null || echo 0)
-        ERROR_STATUS=$(echo "$ERROR_RATE < 5" | bc -l | grep -q 1 && echo "✅" || echo "❌")
+        ERROR_STATUS=$([ "$(echo "$ERROR_RATE < 5" | bc -l)" = "1" ] && echo "✅" || echo "❌")
         echo "| **Error Rate** | ${ERROR_RATE}% | $ERROR_STATUS |" >> performance-report.md
         
         # Total Requests
