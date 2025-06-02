@@ -1,7 +1,229 @@
+/* eslint-disable functional/immutable-data -- Parameter reassignments are for validation only, not mutations */
 /**
  * Grocy - A JavaScript wrapper for the Grocy REST API
  *
  * Authentication is done via API keys (header *GROCY-API-KEY* or same named query parameter)
+ */
+
+// Validation helper functions following immutable patterns
+
+/**
+ * Validates that a value is a positive integer
+ * @param {*} value - The value to validate
+ * @param {string} fieldName - The name of the field for error messages
+ * @returns {number} - The validated number
+ * @throws {Error} - If the value is not a positive integer
+ */
+function validateId(value, fieldName) {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw Object.freeze(new Error(`${fieldName} must be a positive integer`));
+  }
+  return value;
+}
+
+/**
+ * Validates that a value is a non-negative number
+ * @param {*} value - The value to validate
+ * @param {string} fieldName - The name of the field for error messages
+ * @param {Object} options - Validation options
+ * @param {number} options.min - Minimum allowed value (default: 0)
+ * @param {number} options.max - Maximum allowed value (optional)
+ * @returns {number} - The validated number
+ * @throws {Error} - If the value is not a valid number
+ */
+function validateNumber(value, fieldName, options = {}) {
+  const { min = 0, max } = Object.freeze(options);
+
+  if (typeof value !== 'number' || isNaN(value)) {
+    throw Object.freeze(new Error(`${fieldName} must be a valid number`));
+  }
+
+  if (value < min) {
+    throw Object.freeze(new Error(`${fieldName} must be at least ${min}`));
+  }
+
+  if (max !== undefined && value > max) {
+    throw Object.freeze(new Error(`${fieldName} must be at most ${max}`));
+  }
+
+  return value;
+}
+
+/**
+ * Validates that a value is a string
+ * @param {*} value - The value to validate
+ * @param {string} fieldName - The name of the field for error messages
+ * @param {Object} options - Validation options
+ * @param {boolean} options.required - Whether the string is required (default: true)
+ * @param {number} options.maxLength - Maximum string length (default: 255)
+ * @param {number} options.minLength - Minimum string length (optional)
+ * @returns {string} - The validated string
+ * @throws {Error} - If the value is not a valid string
+ */
+function validateString(value, fieldName, options = {}) {
+  const { required = true, maxLength = 255, minLength } = Object.freeze(options);
+
+  if (required && (!value || typeof value !== 'string' || !value.trim())) {
+    throw Object.freeze(new Error(`${fieldName} is required and must be non-empty`));
+  }
+
+  if (!required && !value) {
+    return value || '';
+  }
+
+  if (typeof value !== 'string') {
+    throw Object.freeze(new Error(`${fieldName} must be a string`));
+  }
+
+  const trimmedLength = value.trim().length;
+
+  if (minLength !== undefined && trimmedLength < minLength) {
+    throw Object.freeze(new Error(`${fieldName} must be at least ${minLength} characters`));
+  }
+
+  if (trimmedLength > maxLength) {
+    throw Object.freeze(new Error(`${fieldName} must not exceed ${maxLength} characters`));
+  }
+
+  return value;
+}
+
+/**
+ * Validates that a value is a valid date
+ * @param {*} value - The value to validate (Date object or ISO string)
+ * @param {string} fieldName - The name of the field for error messages
+ * @returns {string} - The validated date string
+ * @throws {Error} - If the value is not a valid date
+ */
+function validateDate(value, fieldName) {
+  if (!value) {
+    throw Object.freeze(new Error(`${fieldName} is required`));
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  } else if (typeof value === 'string') {
+    const date = new Date(value);
+    if (isNaN(date.getTime())) {
+      throw Object.freeze(new Error(`${fieldName} is not a valid date`));
+    }
+    // Return original string if it's valid
+    return value;
+  } else {
+    throw Object.freeze(new Error(`${fieldName} must be a Date object or date string`));
+  }
+}
+
+/**
+ * Validates an optional ID value
+ * @param {*} value - The value to validate
+ * @param {string} fieldName - The name of the field for error messages
+ * @returns {number|null} - The validated number or null
+ * @throws {Error} - If the value is provided but not a positive integer
+ */
+function validateOptionalId(value, fieldName) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  return validateId(value, fieldName);
+}
+
+/**
+ * Validates an optional number value
+ * @param {*} value - The value to validate
+ * @param {string} fieldName - The name of the field for error messages
+ * @param {Object} options - Validation options
+ * @returns {number|null} - The validated number or null
+ * @throws {Error} - If the value is provided but not a valid number
+ */
+function validateOptionalNumber(value, fieldName, options = {}) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  return validateNumber(value, fieldName, options);
+}
+
+/**
+ * Validates an optional date value
+ * @param {*} value - The value to validate
+ * @param {string} fieldName - The name of the field for error messages
+ * @returns {string|null} - The validated date string or null
+ * @throws {Error} - If the value is provided but not a valid date
+ */
+function validateOptionalDate(value, fieldName) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  return validateDate(value, fieldName);
+}
+
+/**
+ * Validates an optional string value
+ * @param {*} value - The value to validate
+ * @param {string} fieldName - The name of the field for error messages
+ * @param {Object} options - Validation options
+ * @returns {string|null} - The validated string or null
+ * @throws {Error} - If the value is provided but not a valid string
+ */
+function validateOptionalString(value, fieldName, options = {}) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  return validateString(value, fieldName, { ...options, required: false });
+}
+
+/**
+ * Validates a boolean value
+ * @param {*} value - The value to validate
+ * @param {string} fieldName - The name of the field for error messages
+ * @returns {boolean} - The validated boolean
+ * @throws {Error} - If the value is not a boolean
+ */
+function validateBoolean(value, fieldName) {
+  if (typeof value !== 'boolean') {
+    throw Object.freeze(new Error(`${fieldName} must be a boolean`));
+  }
+  return value;
+}
+
+/**
+ * Validates an array value
+ * @param {*} value - The value to validate
+ * @param {string} fieldName - The name of the field for error messages
+ * @param {Object} options - Validation options
+ * @param {boolean} options.required - Whether the array is required (default: true)
+ * @param {Function} options.itemValidator - Optional validator for array items
+ * @returns {Array} - The validated array (frozen)
+ * @throws {Error} - If the value is not a valid array
+ */
+function validateArray(value, fieldName, options = {}) {
+  const { required = true, itemValidator } = Object.freeze(options);
+
+  if (required && !Array.isArray(value)) {
+    throw Object.freeze(new Error(`${fieldName} must be an array`));
+  }
+
+  if (!required && !value) {
+    return Object.freeze([]);
+  }
+
+  if (!Array.isArray(value)) {
+    throw Object.freeze(new Error(`${fieldName} must be an array`));
+  }
+
+  if (itemValidator) {
+    const validatedItems = value.map((item, index) =>
+      itemValidator(item, `${fieldName}[${index}]`)
+    );
+    return Object.freeze(validatedItems);
+  }
+
+  return Object.freeze([...value]);
+}
+
+/**
+ * Grocy API client for Node.js
+ * @class Grocy
  */
 export default class Grocy {
   /**
@@ -9,15 +231,15 @@ export default class Grocy {
    * @param {string} apiKey - Your Grocy API key
    */
   constructor(baseUrl, apiKey = null) {
-    if (typeof baseUrl !== 'string' || baseUrl.trim().length === 0) {
-      throw new Error('Base URL must be a non-empty string');
-    }
-    if (apiKey !== null && (typeof apiKey !== 'string' || apiKey.trim().length === 0)) {
-      throw new Error('API key must be a non-empty string or null');
-    }
-    
-    this.baseUrl = baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
-    this.apiKey = apiKey;
+    // Validate inputs using immutable validation functions
+    const validatedBaseUrl = validateString(baseUrl, 'Base URL', { minLength: 1 });
+    const validatedApiKey = validateOptionalString(apiKey, 'API key', { minLength: 1 });
+
+    // Immutable assignment
+    this.baseUrl = Object.freeze(
+      validatedBaseUrl.endsWith('/api') ? validatedBaseUrl : `${validatedBaseUrl}/api`
+    );
+    this.apiKey = validatedApiKey ? Object.freeze(validatedApiKey) : null;
   }
 
   /**
@@ -25,10 +247,11 @@ export default class Grocy {
    * @param {string} apiKey - Your Grocy API key
    */
   setApiKey(apiKey) {
-    if (apiKey !== null && (typeof apiKey !== 'string' || apiKey.trim().length === 0)) {
-      throw new Error('API key must be a non-empty string or null');
-    }
-    this.apiKey = apiKey;
+    // Validate input using immutable validation function
+    const validatedApiKey = validateOptionalString(apiKey, 'API key', { minLength: 1 });
+
+    // Immutable assignment
+    this.apiKey = validatedApiKey ? Object.freeze(validatedApiKey) : null;
   }
 
   /**
@@ -50,24 +273,23 @@ export default class Grocy {
     if (queryParams && Object.keys(queryParams).length > 0) {
       Object.entries(queryParams).forEach(([key, value]) => {
         if (Array.isArray(value)) {
+          // eslint-disable-next-line functional/immutable-data
           value.forEach((v) => url.searchParams.append(`${key}[]`, v));
         } else if (value !== undefined && value !== null) {
+          // eslint-disable-next-line functional/immutable-data
           url.searchParams.append(key, value.toString());
         }
       });
     }
 
-    const options = {
+    const options = Object.freeze({
       method,
-      headers: {
+      headers: Object.freeze({
         'GROCY-API-KEY': this.apiKey,
         'Content-Type': 'application/json',
-      },
-    };
-
-    if (data && (method === 'POST' || method === 'PUT')) {
-      options.body = JSON.stringify(data);
-    }
+      }),
+      ...(data && (method === 'POST' || method === 'PUT') && { body: JSON.stringify(data) }),
+    });
 
     try {
       const response = await fetch(url, options);
@@ -152,10 +374,10 @@ export default class Grocy {
    * @returns {Promise<Object>} - Stock entry details
    */
   async getStockEntry(entryId) {
-    if (!Number.isInteger(entryId) || entryId <= 0) {
-      throw new Error('Entry ID must be a positive integer');
-    }
-    
+    // Validate input
+    // eslint-disable-next-line functional/immutable-data
+    entryId = validateId(entryId, 'Entry ID');
+
     return this.request(`/stock/entry/${entryId}`);
   }
 
@@ -166,7 +388,58 @@ export default class Grocy {
    * @returns {Promise<Array>} - Stock log entries
    */
   async editStockEntry(entryId, data) {
-    return this.request(`/stock/entry/${entryId}`, 'PUT', data);
+    // Validate inputs
+    // eslint-disable-next-line functional/immutable-data
+    entryId = validateId(entryId, 'Entry ID');
+
+    if (!data || typeof data !== 'object') {
+      throw Object.freeze(new Error('Stock entry data must be a non-null object'));
+    }
+
+    // Create immutable validated data - allow all fields to be updated
+    const validatedData = Object.freeze({
+      amount:
+        data.amount !== undefined ? validateNumber(data.amount, 'Amount', { min: 0 }) : undefined,
+      best_before_date:
+        data.best_before_date !== undefined
+          ? validateOptionalDate(data.best_before_date, 'Best before date')
+          : undefined,
+      price:
+        data.price !== undefined
+          ? validateOptionalNumber(data.price, 'Price', { min: 0 })
+          : undefined,
+      open: data.open !== undefined ? validateBoolean(data.open, 'Open') : undefined,
+      opened_date:
+        data.opened_date !== undefined
+          ? validateOptionalDate(data.opened_date, 'Opened date')
+          : undefined,
+      location_id:
+        data.location_id !== undefined
+          ? validateOptionalId(data.location_id, 'Location ID')
+          : undefined,
+      shopping_location_id:
+        data.shopping_location_id !== undefined
+          ? validateOptionalId(data.shopping_location_id, 'Shopping location ID')
+          : undefined,
+      ...Object.entries(data).reduce((acc, [key, value]) => {
+        if (
+          ![
+            'amount',
+            'best_before_date',
+            'price',
+            'open',
+            'opened_date',
+            'location_id',
+            'shopping_location_id',
+          ].includes(key)
+        ) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {}),
+    });
+
+    return this.request(`/stock/entry/${entryId}`, 'PUT', validatedData);
   }
 
   /**
@@ -175,6 +448,10 @@ export default class Grocy {
    * @returns {Promise<Object>} - Volatile stock information
    */
   async getVolatileStock(dueSoonDays = 5) {
+    // Validate input
+    // eslint-disable-next-line functional/immutable-data
+    dueSoonDays = validateNumber(dueSoonDays, 'Due soon days', { min: 0, max: 365 });
+
     return this.request('/stock/volatile', 'GET', null, { due_soon_days: dueSoonDays });
   }
 
@@ -184,10 +461,10 @@ export default class Grocy {
    * @returns {Promise<Object>} - Product details
    */
   async getProductDetails(productId) {
-    if (!Number.isInteger(productId) || productId <= 0) {
-      throw new Error('Product ID must be a positive integer');
-    }
-    
+    // Validate input
+    // eslint-disable-next-line functional/immutable-data
+    productId = validateId(productId, 'Product ID');
+
     return this.request(`/stock/products/${productId}`);
   }
 
@@ -197,10 +474,10 @@ export default class Grocy {
    * @returns {Promise<Object>} - Product details
    */
   async getProductByBarcode(barcode) {
-    if (typeof barcode !== 'string' || barcode.trim().length === 0) {
-      throw new Error('Barcode must be a non-empty string');
-    }
-    
+    // Validate input
+    // eslint-disable-next-line functional/immutable-data
+    barcode = validateString(barcode, 'Barcode', { minLength: 1, maxLength: 200 });
+
     return this.request(`/stock/products/by-barcode/${barcode}`);
   }
 
@@ -211,17 +488,41 @@ export default class Grocy {
    * @returns {Promise<Array>} - Stock log entries
    */
   async addProductToStock(productId, data) {
-    if (!Number.isInteger(productId) || productId <= 0) {
-      throw new Error('Product ID must be a positive integer');
-    }
+    // Validate inputs
+    productId = validateId(productId, 'Product ID');
+
     if (!data || typeof data !== 'object') {
-      throw new Error('Stock data must be a non-null object');
+      throw Object.freeze(new Error('Stock data must be a non-null object'));
     }
-    if (data.amount !== undefined && (typeof data.amount !== 'number' || data.amount <= 0)) {
-      throw new Error('Amount must be a positive number');
-    }
-    
-    return this.request(`/stock/products/${productId}/add`, 'POST', data);
+
+    // Create immutable validated data
+    const validatedData = Object.freeze({
+      amount: validateNumber(data.amount, 'Amount', { min: 0.001 }),
+      price: validateOptionalNumber(data.price, 'Price', { min: 0 }),
+      best_before_date: validateOptionalDate(data.best_before_date, 'Best before date'),
+      location_id: validateOptionalId(data.location_id, 'Location ID'),
+      shopping_location_id: validateOptionalId(data.shopping_location_id, 'Shopping location ID'),
+      transaction_type: validateOptionalString(data.transaction_type, 'Transaction type', {
+        maxLength: 50,
+      }),
+      ...Object.entries(data).reduce((acc, [key, value]) => {
+        if (
+          ![
+            'amount',
+            'price',
+            'best_before_date',
+            'location_id',
+            'shopping_location_id',
+            'transaction_type',
+          ].includes(key)
+        ) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {}),
+    });
+
+    return this.request(`/stock/products/${productId}/add`, 'POST', validatedData);
   }
 
   /**
@@ -231,7 +532,41 @@ export default class Grocy {
    * @returns {Promise<Array>} - Stock log entries
    */
   async addProductToStockByBarcode(barcode, data) {
-    return this.request(`/stock/products/by-barcode/${barcode}/add`, 'POST', data);
+    // Validate inputs
+    barcode = validateString(barcode, 'Barcode', { minLength: 1, maxLength: 200 });
+
+    if (!data || typeof data !== 'object') {
+      throw Object.freeze(new Error('Stock data must be a non-null object'));
+    }
+
+    // Create immutable validated data
+    const validatedData = Object.freeze({
+      amount: validateNumber(data.amount, 'Amount', { min: 0.001 }),
+      price: validateOptionalNumber(data.price, 'Price', { min: 0 }),
+      best_before_date: validateOptionalDate(data.best_before_date, 'Best before date'),
+      location_id: validateOptionalId(data.location_id, 'Location ID'),
+      shopping_location_id: validateOptionalId(data.shopping_location_id, 'Shopping location ID'),
+      transaction_type: validateOptionalString(data.transaction_type, 'Transaction type', {
+        maxLength: 50,
+      }),
+      ...Object.entries(data).reduce((acc, [key, value]) => {
+        if (
+          ![
+            'amount',
+            'price',
+            'best_before_date',
+            'location_id',
+            'shopping_location_id',
+            'transaction_type',
+          ].includes(key)
+        ) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {}),
+    });
+
+    return this.request(`/stock/products/by-barcode/${barcode}/add`, 'POST', validatedData);
   }
 
   /**
@@ -241,17 +576,44 @@ export default class Grocy {
    * @returns {Promise<Array>} - Stock log entries
    */
   async consumeProduct(productId, data) {
-    if (!Number.isInteger(productId) || productId <= 0) {
-      throw new Error('Product ID must be a positive integer');
-    }
+    // Validate inputs
+    productId = validateId(productId, 'Product ID');
+
     if (!data || typeof data !== 'object') {
-      throw new Error('Consumption data must be a non-null object');
+      throw Object.freeze(new Error('Consumption data must be a non-null object'));
     }
-    if (data.amount !== undefined && (typeof data.amount !== 'number' || data.amount <= 0)) {
-      throw new Error('Amount must be a positive number');
-    }
-    
-    return this.request(`/stock/products/${productId}/consume`, 'POST', data);
+
+    // Create immutable validated data
+    const validatedData = Object.freeze({
+      amount: validateNumber(data.amount, 'Amount', { min: 0.001 }),
+      transaction_type: validateOptionalString(data.transaction_type, 'Transaction type', {
+        maxLength: 50,
+      }),
+      spoiled: data.spoiled !== undefined ? validateBoolean(data.spoiled, 'Spoiled') : undefined,
+      location_id: validateOptionalId(data.location_id, 'Location ID'),
+      recipe_id: validateOptionalId(data.recipe_id, 'Recipe ID'),
+      exact_amount:
+        data.exact_amount !== undefined
+          ? validateBoolean(data.exact_amount, 'Exact amount')
+          : undefined,
+      ...Object.entries(data).reduce((acc, [key, value]) => {
+        if (
+          ![
+            'amount',
+            'transaction_type',
+            'spoiled',
+            'location_id',
+            'recipe_id',
+            'exact_amount',
+          ].includes(key)
+        ) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {}),
+    });
+
+    return this.request(`/stock/products/${productId}/consume`, 'POST', validatedData);
   }
 
   /**
@@ -261,7 +623,44 @@ export default class Grocy {
    * @returns {Promise<Array>} - Stock log entries
    */
   async consumeProductByBarcode(barcode, data) {
-    return this.request(`/stock/products/by-barcode/${barcode}/consume`, 'POST', data);
+    // Validate inputs
+    barcode = validateString(barcode, 'Barcode', { minLength: 1, maxLength: 200 });
+
+    if (!data || typeof data !== 'object') {
+      throw Object.freeze(new Error('Consumption data must be a non-null object'));
+    }
+
+    // Create immutable validated data
+    const validatedData = Object.freeze({
+      amount: validateNumber(data.amount, 'Amount', { min: 0.001 }),
+      transaction_type: validateOptionalString(data.transaction_type, 'Transaction type', {
+        maxLength: 50,
+      }),
+      spoiled: data.spoiled !== undefined ? validateBoolean(data.spoiled, 'Spoiled') : undefined,
+      location_id: validateOptionalId(data.location_id, 'Location ID'),
+      recipe_id: validateOptionalId(data.recipe_id, 'Recipe ID'),
+      exact_amount:
+        data.exact_amount !== undefined
+          ? validateBoolean(data.exact_amount, 'Exact amount')
+          : undefined,
+      ...Object.entries(data).reduce((acc, [key, value]) => {
+        if (
+          ![
+            'amount',
+            'transaction_type',
+            'spoiled',
+            'location_id',
+            'recipe_id',
+            'exact_amount',
+          ].includes(key)
+        ) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {}),
+    });
+
+    return this.request(`/stock/products/by-barcode/${barcode}/consume`, 'POST', validatedData);
   }
 
   /**
@@ -271,7 +670,30 @@ export default class Grocy {
    * @returns {Promise<Array>} - Stock log entries
    */
   async transferProduct(productId, data) {
-    return this.request(`/stock/products/${productId}/transfer`, 'POST', data);
+    // Validate inputs
+    productId = validateId(productId, 'Product ID');
+
+    if (!data || typeof data !== 'object') {
+      throw Object.freeze(new Error('Transfer data must be a non-null object'));
+    }
+
+    // Create immutable validated data
+    const validatedData = Object.freeze({
+      amount: validateNumber(data.amount, 'Amount', { min: 0.001 }),
+      location_id_from: validateId(data.location_id_from, 'Source location ID'),
+      location_id_to: validateId(data.location_id_to, 'Destination location ID'),
+      transaction_type: validateOptionalString(data.transaction_type, 'Transaction type', {
+        maxLength: 50,
+      }),
+      ...Object.entries(data).reduce((acc, [key, value]) => {
+        if (!['amount', 'location_id_from', 'location_id_to', 'transaction_type'].includes(key)) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {}),
+    });
+
+    return this.request(`/stock/products/${productId}/transfer`, 'POST', validatedData);
   }
 
   /**
@@ -281,7 +703,37 @@ export default class Grocy {
    * @returns {Promise<Array>} - Stock log entries
    */
   async inventoryProduct(productId, data) {
-    return this.request(`/stock/products/${productId}/inventory`, 'POST', data);
+    // Validate inputs
+    productId = validateId(productId, 'Product ID');
+
+    if (!data || typeof data !== 'object') {
+      throw Object.freeze(new Error('Inventory data must be a non-null object'));
+    }
+
+    // Create immutable validated data
+    const validatedData = Object.freeze({
+      new_amount: validateNumber(data.new_amount, 'New amount', { min: 0 }),
+      best_before_date: validateOptionalDate(data.best_before_date, 'Best before date'),
+      location_id: validateOptionalId(data.location_id, 'Location ID'),
+      price: validateOptionalNumber(data.price, 'Price', { min: 0 }),
+      shopping_location_id: validateOptionalId(data.shopping_location_id, 'Shopping location ID'),
+      ...Object.entries(data).reduce((acc, [key, value]) => {
+        if (
+          ![
+            'new_amount',
+            'best_before_date',
+            'location_id',
+            'price',
+            'shopping_location_id',
+          ].includes(key)
+        ) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {}),
+    });
+
+    return this.request(`/stock/products/${productId}/inventory`, 'POST', validatedData);
   }
 
   /**
@@ -291,7 +743,30 @@ export default class Grocy {
    * @returns {Promise<Array>} - Stock log entries
    */
   async openProduct(productId, data) {
-    return this.request(`/stock/products/${productId}/open`, 'POST', data);
+    // Validate inputs
+    productId = validateId(productId, 'Product ID');
+
+    if (!data || typeof data !== 'object') {
+      throw Object.freeze(new Error('Open data must be a non-null object'));
+    }
+
+    // Create immutable validated data
+    const validatedData = Object.freeze({
+      amount: validateOptionalNumber(data.amount, 'Amount', { min: 0.001 }),
+      location_id: validateOptionalId(data.location_id, 'Location ID'),
+      allow_subproduct_substitution:
+        data.allow_subproduct_substitution !== undefined
+          ? validateBoolean(data.allow_subproduct_substitution, 'Allow subproduct substitution')
+          : undefined,
+      ...Object.entries(data).reduce((acc, [key, value]) => {
+        if (!['amount', 'location_id', 'allow_subproduct_substitution'].includes(key)) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {}),
+    });
+
+    return this.request(`/stock/products/${productId}/open`, 'POST', validatedData);
   }
 
   // Shopping list endpoints
@@ -338,7 +813,26 @@ export default class Grocy {
    * @returns {Promise<Object>} - Success status
    */
   async addProductToShoppingList(data) {
-    return this.request('/stock/shoppinglist/add-product', 'POST', data);
+    // Validate input
+    if (!data || typeof data !== 'object') {
+      throw Object.freeze(new Error('Shopping list item data must be a non-null object'));
+    }
+
+    // Create immutable validated data
+    const validatedData = Object.freeze({
+      product_id: validateId(data.product_id, 'Product ID'),
+      list_id: validateOptionalId(data.list_id, 'List ID'),
+      product_amount: validateOptionalNumber(data.product_amount, 'Product amount', { min: 0.001 }),
+      note: validateOptionalString(data.note, 'Note', { maxLength: 500 }),
+      ...Object.entries(data).reduce((acc, [key, value]) => {
+        if (!['product_id', 'list_id', 'product_amount', 'note'].includes(key)) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {}),
+    });
+
+    return this.request('/stock/shoppinglist/add-product', 'POST', validatedData);
   }
 
   /**
@@ -347,7 +841,25 @@ export default class Grocy {
    * @returns {Promise<Object>} - Success status
    */
   async removeProductFromShoppingList(data) {
-    return this.request('/stock/shoppinglist/remove-product', 'POST', data);
+    // Validate input
+    if (!data || typeof data !== 'object') {
+      throw Object.freeze(new Error('Shopping list item data must be a non-null object'));
+    }
+
+    // Create immutable validated data
+    const validatedData = Object.freeze({
+      product_id: validateId(data.product_id, 'Product ID'),
+      list_id: validateOptionalId(data.list_id, 'List ID'),
+      product_amount: validateOptionalNumber(data.product_amount, 'Product amount', { min: 0.001 }),
+      ...Object.entries(data).reduce((acc, [key, value]) => {
+        if (!['product_id', 'list_id', 'product_amount'].includes(key)) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {}),
+    });
+
+    return this.request('/stock/shoppinglist/remove-product', 'POST', validatedData);
   }
 
   // Generic entity interactions
@@ -359,13 +871,16 @@ export default class Grocy {
    * @returns {Promise<Array>} - Entity objects
    */
   async getObjects(entity, options = {}) {
-    const { query, order, limit, offset } = options;
-    const params = {};
+    // Validate entity name
+    entity = validateString(entity, 'Entity name', { minLength: 1, maxLength: 50 });
 
-    if (query) params.query = query;
-    if (order) params.order = order;
-    if (limit) params.limit = limit;
-    if (offset) params.offset = offset;
+    const { query, order, limit, offset } = options;
+    const params = Object.freeze({
+      ...(query && { query }),
+      ...(order && { order }),
+      ...(limit !== undefined && { limit }),
+      ...(offset !== undefined && { offset }),
+    });
 
     return this.request(`/objects/${entity}`, 'GET', null, params);
   }
@@ -377,7 +892,17 @@ export default class Grocy {
    * @returns {Promise<Object>} - Created object info
    */
   async addObject(entity, data) {
-    return this.request(`/objects/${entity}`, 'POST', data);
+    // Validate inputs
+    entity = validateString(entity, 'Entity name', { minLength: 1, maxLength: 50 });
+
+    if (!data || typeof data !== 'object') {
+      throw Object.freeze(new Error('Entity data must be a non-null object'));
+    }
+
+    // Freeze the data to ensure immutability
+    const validatedData = Object.freeze({ ...data });
+
+    return this.request(`/objects/${entity}`, 'POST', validatedData);
   }
 
   /**
@@ -387,6 +912,10 @@ export default class Grocy {
    * @returns {Promise<Object>} - Entity object
    */
   async getObject(entity, objectId) {
+    // Validate inputs
+    entity = validateString(entity, 'Entity name', { minLength: 1, maxLength: 50 });
+    objectId = validateId(objectId, 'Object ID');
+
     return this.request(`/objects/${entity}/${objectId}`);
   }
 
@@ -398,7 +927,18 @@ export default class Grocy {
    * @returns {Promise<Object>} - Success status
    */
   async editObject(entity, objectId, data) {
-    return this.request(`/objects/${entity}/${objectId}`, 'PUT', data);
+    // Validate inputs
+    entity = validateString(entity, 'Entity name', { minLength: 1, maxLength: 50 });
+    objectId = validateId(objectId, 'Object ID');
+
+    if (!data || typeof data !== 'object') {
+      throw Object.freeze(new Error('Entity data must be a non-null object'));
+    }
+
+    // Freeze the data to ensure immutability
+    const validatedData = Object.freeze({ ...data });
+
+    return this.request(`/objects/${entity}/${objectId}`, 'PUT', validatedData);
   }
 
   /**
@@ -408,6 +948,10 @@ export default class Grocy {
    * @returns {Promise<Object>} - Success status
    */
   async deleteObject(entity, objectId) {
+    // Validate inputs
+    entity = validateString(entity, 'Entity name', { minLength: 1, maxLength: 50 });
+    objectId = validateId(objectId, 'Object ID');
+
     return this.request(`/objects/${entity}/${objectId}`, 'DELETE');
   }
 
@@ -420,6 +964,15 @@ export default class Grocy {
    * @returns {Promise<Object>} - Userfields
    */
   async getUserfields(entity, objectId) {
+    // Validate inputs
+    entity = validateString(entity, 'Entity name', { minLength: 1, maxLength: 50 });
+    // Object ID can be string or number for userfields
+    if (typeof objectId === 'number') {
+      objectId = validateId(objectId, 'Object ID');
+    } else {
+      objectId = validateString(objectId, 'Object ID', { minLength: 1, maxLength: 100 });
+    }
+
     return this.request(`/userfields/${entity}/${objectId}`);
   }
 
@@ -431,7 +984,23 @@ export default class Grocy {
    * @returns {Promise<Object>} - Success status
    */
   async setUserfields(entity, objectId, data) {
-    return this.request(`/userfields/${entity}/${objectId}`, 'PUT', data);
+    // Validate inputs
+    entity = validateString(entity, 'Entity name', { minLength: 1, maxLength: 50 });
+    // Object ID can be string or number for userfields
+    if (typeof objectId === 'number') {
+      objectId = validateId(objectId, 'Object ID');
+    } else {
+      objectId = validateString(objectId, 'Object ID', { minLength: 1, maxLength: 100 });
+    }
+
+    if (!data || typeof data !== 'object') {
+      throw Object.freeze(new Error('Userfields data must be a non-null object'));
+    }
+
+    // Freeze the data to ensure immutability
+    const validatedData = Object.freeze({ ...data });
+
+    return this.request(`/userfields/${entity}/${objectId}`, 'PUT', validatedData);
   }
 
   // File endpoints
@@ -444,7 +1013,24 @@ export default class Grocy {
    * @returns {Promise<Object>} - File data
    */
   async getFile(group, fileName, options = {}) {
-    return this.request(`/files/${group}/${fileName}`, 'GET', null, options);
+    // Validate inputs
+    group = validateString(group, 'File group', { minLength: 1, maxLength: 100 });
+    fileName = validateString(fileName, 'File name', { minLength: 1, maxLength: 255 });
+
+    // Validate options if provided
+    const validatedOptions = Object.freeze({
+      force_serve_as: validateOptionalString(options.force_serve_as, 'Force serve as', {
+        maxLength: 100,
+      }),
+      ...Object.entries(options).reduce((acc, [key, value]) => {
+        if (key !== 'force_serve_as') {
+          acc[key] = value;
+        }
+        return acc;
+      }, {}),
+    });
+
+    return this.request(`/files/${group}/${fileName}`, 'GET', null, validatedOptions);
   }
 
   /**
@@ -456,16 +1042,15 @@ export default class Grocy {
    */
   async uploadFile(group, fileName, fileData) {
     if (!this.apiKey) {
-      throw new Error('API key is required. Use setApiKey() to set it.');
+      throw Object.freeze(new Error('API key is required. Use setApiKey() to set it.'));
     }
-    if (typeof group !== 'string' || group.trim().length === 0) {
-      throw new Error('File group must be a non-empty string');
-    }
-    if (typeof fileName !== 'string' || fileName.trim().length === 0) {
-      throw new Error('File name must be a non-empty string');
-    }
+
+    // Validate inputs
+    group = validateString(group, 'File group', { minLength: 1, maxLength: 100 });
+    fileName = validateString(fileName, 'File name', { minLength: 1, maxLength: 255 });
+
     if (!fileData) {
-      throw new Error('File data is required');
+      throw Object.freeze(new Error('File data is required'));
     }
 
     const url = new URL(`${this.baseUrl}/files/${group}/${fileName}`);
@@ -499,6 +1084,10 @@ export default class Grocy {
    * @returns {Promise<Object>} - Success status
    */
   async deleteFile(group, fileName) {
+    // Validate inputs
+    group = validateString(group, 'File group', { minLength: 1, maxLength: 100 });
+    fileName = validateString(fileName, 'File name', { minLength: 1, maxLength: 255 });
+
     return this.request(`/files/${group}/${fileName}`, 'DELETE');
   }
 
@@ -511,12 +1100,12 @@ export default class Grocy {
    */
   async getUsers(options = {}) {
     const { query, order, limit, offset } = options;
-    const params = {};
-
-    if (query) params.query = query;
-    if (order) params.order = order;
-    if (limit) params.limit = limit;
-    if (offset) params.offset = offset;
+    const params = Object.freeze({
+      ...(query && { query }),
+      ...(order && { order }),
+      ...(limit !== undefined && { limit }),
+      ...(offset !== undefined && { offset }),
+    });
 
     return this.request('/users', 'GET', null, params);
   }
@@ -527,7 +1116,26 @@ export default class Grocy {
    * @returns {Promise<Object>} - Success status
    */
   async createUser(data) {
-    return this.request('/users', 'POST', data);
+    // Validate input
+    if (!data || typeof data !== 'object') {
+      throw Object.freeze(new Error('User data must be a non-null object'));
+    }
+
+    // Create immutable validated data
+    const validatedData = Object.freeze({
+      username: validateString(data.username, 'Username', { minLength: 1, maxLength: 50 }),
+      password: validateString(data.password, 'Password', { minLength: 1, maxLength: 200 }),
+      first_name: validateOptionalString(data.first_name, 'First name', { maxLength: 100 }),
+      last_name: validateOptionalString(data.last_name, 'Last name', { maxLength: 100 }),
+      ...Object.entries(data).reduce((acc, [key, value]) => {
+        if (!['username', 'password', 'first_name', 'last_name'].includes(key)) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {}),
+    });
+
+    return this.request('/users', 'POST', validatedData);
   }
 
   /**
@@ -537,7 +1145,40 @@ export default class Grocy {
    * @returns {Promise<Object>} - Success status
    */
   async editUser(userId, data) {
-    return this.request(`/users/${userId}`, 'PUT', data);
+    // Validate inputs
+    userId = validateId(userId, 'User ID');
+
+    if (!data || typeof data !== 'object') {
+      throw Object.freeze(new Error('User data must be a non-null object'));
+    }
+
+    // Create immutable validated data - password is optional for edit
+    const validatedData = Object.freeze({
+      username:
+        data.username !== undefined
+          ? validateString(data.username, 'Username', { minLength: 1, maxLength: 50 })
+          : undefined,
+      password:
+        data.password !== undefined
+          ? validateString(data.password, 'Password', { minLength: 1, maxLength: 200 })
+          : undefined,
+      first_name:
+        data.first_name !== undefined
+          ? validateOptionalString(data.first_name, 'First name', { maxLength: 100 })
+          : undefined,
+      last_name:
+        data.last_name !== undefined
+          ? validateOptionalString(data.last_name, 'Last name', { maxLength: 100 })
+          : undefined,
+      ...Object.entries(data).reduce((acc, [key, value]) => {
+        if (!['username', 'password', 'first_name', 'last_name'].includes(key)) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {}),
+    });
+
+    return this.request(`/users/${userId}`, 'PUT', validatedData);
   }
 
   /**
@@ -546,6 +1187,9 @@ export default class Grocy {
    * @returns {Promise<Object>} - Success status
    */
   async deleteUser(userId) {
+    // Validate input
+    userId = validateId(userId, 'User ID');
+
     return this.request(`/users/${userId}`, 'DELETE');
   }
 
@@ -573,6 +1217,9 @@ export default class Grocy {
    * @returns {Promise<Object>} - Setting value
    */
   async getUserSetting(settingKey) {
+    // Validate input
+    settingKey = validateString(settingKey, 'Setting key', { minLength: 1, maxLength: 100 });
+
     return this.request(`/user/settings/${settingKey}`);
   }
 
@@ -583,7 +1230,17 @@ export default class Grocy {
    * @returns {Promise<Object>} - Success status
    */
   async setUserSetting(settingKey, data) {
-    return this.request(`/user/settings/${settingKey}`, 'PUT', data);
+    // Validate inputs
+    settingKey = validateString(settingKey, 'Setting key', { minLength: 1, maxLength: 100 });
+
+    if (!data || typeof data !== 'object') {
+      throw Object.freeze(new Error('Setting data must be a non-null object'));
+    }
+
+    // Freeze the data to ensure immutability
+    const validatedData = Object.freeze({ ...data });
+
+    return this.request(`/user/settings/${settingKey}`, 'PUT', validatedData);
   }
 
   // Recipe endpoints
@@ -595,7 +1252,29 @@ export default class Grocy {
    * @returns {Promise<Object>} - Success status
    */
   async addRecipeProductsToShoppingList(recipeId, data = {}) {
-    return this.request(`/recipes/${recipeId}/add-not-fulfilled-products-to-shoppinglist`, 'POST', data);
+    // Validate inputs
+    recipeId = validateId(recipeId, 'Recipe ID');
+
+    // Create immutable validated data
+    const validatedData = Object.freeze({
+      excluded_product_ids: data.excluded_product_ids
+        ? validateArray(data.excluded_product_ids, 'Excluded product IDs', {
+            itemValidator: (id) => validateId(id, 'Product ID'),
+          })
+        : undefined,
+      ...Object.entries(data).reduce((acc, [key, value]) => {
+        if (key !== 'excluded_product_ids') {
+          acc[key] = value;
+        }
+        return acc;
+      }, {}),
+    });
+
+    return this.request(
+      `/recipes/${recipeId}/add-not-fulfilled-products-to-shoppinglist`,
+      'POST',
+      validatedData
+    );
   }
 
   /**
@@ -604,6 +1283,9 @@ export default class Grocy {
    * @returns {Promise<Object>} - Recipe fulfillment info
    */
   async getRecipeFulfillment(recipeId) {
+    // Validate input
+    recipeId = validateId(recipeId, 'Recipe ID');
+
     return this.request(`/recipes/${recipeId}/fulfillment`);
   }
 
@@ -613,6 +1295,9 @@ export default class Grocy {
    * @returns {Promise<Object>} - Success status
    */
   async consumeRecipe(recipeId) {
+    // Validate input
+    recipeId = validateId(recipeId, 'Recipe ID');
+
     return this.request(`/recipes/${recipeId}/consume`, 'POST');
   }
 
@@ -623,12 +1308,12 @@ export default class Grocy {
    */
   async getAllRecipesFulfillment(options = {}) {
     const { query, order, limit, offset } = options;
-    const params = {};
-
-    if (query) params.query = query;
-    if (order) params.order = order;
-    if (limit) params.limit = limit;
-    if (offset) params.offset = offset;
+    const params = Object.freeze({
+      ...(query && { query }),
+      ...(order && { order }),
+      ...(limit !== undefined && { limit }),
+      ...(offset !== undefined && { offset }),
+    });
 
     return this.request('/recipes/fulfillment', 'GET', null, params);
   }
@@ -642,12 +1327,12 @@ export default class Grocy {
    */
   async getChores(options = {}) {
     const { query, order, limit, offset } = options;
-    const params = {};
-
-    if (query) params.query = query;
-    if (order) params.order = order;
-    if (limit) params.limit = limit;
-    if (offset) params.offset = offset;
+    const params = Object.freeze({
+      ...(query && { query }),
+      ...(order && { order }),
+      ...(limit !== undefined && { limit }),
+      ...(offset !== undefined && { offset }),
+    });
 
     return this.request('/chores', 'GET', null, params);
   }
@@ -658,6 +1343,9 @@ export default class Grocy {
    * @returns {Promise<Object>} - Chore details
    */
   async getChoreDetails(choreId) {
+    // Validate input
+    choreId = validateId(choreId, 'Chore ID');
+
     return this.request(`/chores/${choreId}`);
   }
 
@@ -668,7 +1356,22 @@ export default class Grocy {
    * @returns {Promise<Object>} - Chore log entry
    */
   async executeChore(choreId, data = {}) {
-    return this.request(`/chores/${choreId}/execute`, 'POST', data);
+    // Validate inputs
+    choreId = validateId(choreId, 'Chore ID');
+
+    // Create immutable validated data
+    const validatedData = Object.freeze({
+      tracked_time: validateOptionalDate(data.tracked_time, 'Tracked time'),
+      done_by: validateOptionalId(data.done_by, 'Done by user ID'),
+      ...Object.entries(data).reduce((acc, [key, value]) => {
+        if (!['tracked_time', 'done_by'].includes(key)) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {}),
+    });
+
+    return this.request(`/chores/${choreId}/execute`, 'POST', validatedData);
   }
 
   // Batteries endpoints
@@ -680,12 +1383,12 @@ export default class Grocy {
    */
   async getBatteries(options = {}) {
     const { query, order, limit, offset } = options;
-    const params = {};
-
-    if (query) params.query = query;
-    if (order) params.order = order;
-    if (limit) params.limit = limit;
-    if (offset) params.offset = offset;
+    const params = Object.freeze({
+      ...(query && { query }),
+      ...(order && { order }),
+      ...(limit !== undefined && { limit }),
+      ...(offset !== undefined && { offset }),
+    });
 
     return this.request('/batteries', 'GET', null, params);
   }
@@ -696,6 +1399,9 @@ export default class Grocy {
    * @returns {Promise<Object>} - Battery details
    */
   async getBatteryDetails(batteryId) {
+    // Validate input
+    batteryId = validateId(batteryId, 'Battery ID');
+
     return this.request(`/batteries/${batteryId}`);
   }
 
@@ -706,7 +1412,21 @@ export default class Grocy {
    * @returns {Promise<Object>} - Battery charge cycle entry
    */
   async chargeBattery(batteryId, data = {}) {
-    return this.request(`/batteries/${batteryId}/charge`, 'POST', data);
+    // Validate inputs
+    batteryId = validateId(batteryId, 'Battery ID');
+
+    // Create immutable validated data
+    const validatedData = Object.freeze({
+      tracked_time: validateOptionalDate(data.tracked_time, 'Tracked time'),
+      ...Object.entries(data).reduce((acc, [key, value]) => {
+        if (key !== 'tracked_time') {
+          acc[key] = value;
+        }
+        return acc;
+      }, {}),
+    });
+
+    return this.request(`/batteries/${batteryId}/charge`, 'POST', validatedData);
   }
 
   // Tasks endpoints
@@ -718,12 +1438,12 @@ export default class Grocy {
    */
   async getTasks(options = {}) {
     const { query, order, limit, offset } = options;
-    const params = {};
-
-    if (query) params.query = query;
-    if (order) params.order = order;
-    if (limit) params.limit = limit;
-    if (offset) params.offset = offset;
+    const params = Object.freeze({
+      ...(query && { query }),
+      ...(order && { order }),
+      ...(limit !== undefined && { limit }),
+      ...(offset !== undefined && { offset }),
+    });
 
     return this.request('/tasks', 'GET', null, params);
   }
@@ -735,7 +1455,21 @@ export default class Grocy {
    * @returns {Promise<Object>} - Success status
    */
   async completeTask(taskId, data = {}) {
-    return this.request(`/tasks/${taskId}/complete`, 'POST', data);
+    // Validate inputs
+    taskId = validateId(taskId, 'Task ID');
+
+    // Create immutable validated data
+    const validatedData = Object.freeze({
+      done_time: validateOptionalDate(data.done_time, 'Done time'),
+      ...Object.entries(data).reduce((acc, [key, value]) => {
+        if (key !== 'done_time') {
+          acc[key] = value;
+        }
+        return acc;
+      }, {}),
+    });
+
+    return this.request(`/tasks/${taskId}/complete`, 'POST', validatedData);
   }
 
   /**
@@ -744,6 +1478,9 @@ export default class Grocy {
    * @returns {Promise<Object>} - Success status
    */
   async undoTask(taskId) {
+    // Validate input
+    taskId = validateId(taskId, 'Task ID');
+
     return this.request(`/tasks/${taskId}/undo`, 'POST');
   }
 
