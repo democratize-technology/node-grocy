@@ -33,6 +33,7 @@ node-grocy/
 ## Technical Expertise
 
 ⚠️ @.claude/knowledge-graph.md
+⚠️ @.claude/host-system.md
 
 ### Core Competencies
 - **Languages**: TypeScript (expert), JavaScript ES6+ (expert), Node.js internals
