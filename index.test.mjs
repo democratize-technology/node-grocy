@@ -932,7 +932,7 @@ test('File upload with error handling', async (t) => {
     json: async () => ({ error_message: 'Server error' })
   };
   const uploadErrorFetchMock = t.mock.method(global, 'fetch', () => Promise.resolve(errorResponse));
-  await assert.rejects(() => client.uploadFile(group, fileName, fileData), { message: 'Failed to upload file: Server error' });
+  await assert.rejects(() => client.uploadFile(group, fileName, fileData), { message: 'Grocy API request failed: Server error' });
   assert.strictEqual(uploadErrorFetchMock.mock.calls.length, 1);
   
   // Test upload file with error without error_message
@@ -942,12 +942,12 @@ test('File upload with error handling', async (t) => {
     json: async () => ({})
   };
   const uploadErrorNoMessageFetchMock = t.mock.method(global, 'fetch', () => Promise.resolve(errorNoMessageResponse));
-  await assert.rejects(() => client.uploadFile(group, fileName, fileData), { message: 'Failed to upload file: HTTP error! status: 404' });
+  await assert.rejects(() => client.uploadFile(group, fileName, fileData), { message: 'Grocy API request failed: HTTP error! status: 404' });
   assert.strictEqual(uploadErrorNoMessageFetchMock.mock.calls.length, 1);
   
   // Test upload file with network error
   const networkErrorFetchMock = t.mock.method(global, 'fetch', () => Promise.reject(new Error('Network error')));
-  await assert.rejects(() => client.uploadFile(group, fileName, fileData), { message: 'Failed to upload file: Network error' });
+  await assert.rejects(() => client.uploadFile(group, fileName, fileData), { message: 'Grocy API request failed: Network error' });
   assert.strictEqual(networkErrorFetchMock.mock.calls.length, 1);
 });
 

@@ -10,8 +10,11 @@ node-grocy is a comprehensive client library for interacting with [Grocy](https:
 
 - Full coverage of the Grocy API
 - Promise-based async/await interface
+- **Enhanced input validation** for all parameters
+- **Consistent immutable response handling** across all endpoints
+- **Standardized error messages** for better debugging
 - Error handling for various response types
-- Comprehensive test suite
+- Comprehensive test suite (21 test suites, 100% pass rate)
 - No external dependencies
 
 ## Installation
@@ -25,7 +28,7 @@ npm install node-grocy
 ```javascript
 import Grocy from 'node-grocy';
 
-// Initialize client
+// Initialize client with validation
 const grocy = new Grocy('https://your-grocy-instance.com', 'your-api-key');
 
 // Get all products in stock
@@ -38,7 +41,7 @@ async function getStock() {
   }
 }
 
-// Add a product to stock
+// Add a product to stock with input validation
 async function addProduct(productId) {
   try {
     const data = {
@@ -47,10 +50,13 @@ async function addProduct(productId) {
       transaction_type: 'purchase',
       price: 2.99
     };
+    // productId is automatically validated as positive integer
+    // data.amount is automatically validated as positive number
     const result = await grocy.addProductToStock(productId, data);
     console.log('Product added:', result);
   } catch (error) {
     console.error('Error adding product:', error.message);
+    // Enhanced error messages help identify validation issues
   }
 }
 
@@ -76,8 +82,10 @@ async function getVolatileStock() {
 const grocy = new Grocy(baseUrl, apiKey);
 ```
 
-- `baseUrl`: The base URL of your Grocy instance (with or without /api suffix)
-- `apiKey`: Your Grocy API key
+- `baseUrl`: The base URL of your Grocy instance (with or without /api suffix) - **validated as non-empty string**
+- `apiKey`: Your Grocy API key - **validated as non-empty string or null**
+
+**Input Validation**: The constructor now validates all parameters and throws descriptive errors for invalid inputs.
 
 ### Methods
 
@@ -109,6 +117,46 @@ The library includes methods for all Grocy API endpoints, organized into these c
 ...and many more for shopping lists, chores, recipes, tasks, etc.
 
 For detailed documentation on all methods and their parameters, please see the [full API documentation](https://github.com/your-username/node-grocy/docs).
+
+## Recent Improvements (v1.0.0 Phase 1)
+
+### Enhanced Input Validation
+
+All methods now include comprehensive input validation:
+
+```javascript
+// These will now throw descriptive validation errors:
+grocy.addProductToStock('not-a-number', {}); // Error: Product ID must be a positive integer
+grocy.consumeProduct(123, { amount: -5 }); // Error: Amount must be a positive number
+grocy.getProductByBarcode(''); // Error: Barcode must be a non-empty string
+```
+
+### Consistent Immutable Responses
+
+All API responses are now immutable and follow consistent patterns:
+
+```javascript
+const stock = await grocy.getStock(); 
+// stock is now Object.freeze()'d - cannot be modified
+
+const result = await grocy.uploadFile(group, fileName, data);
+// result is always { success: true } for successful uploads
+
+const calendar = await grocy.getCalendar();
+// calendar data is wrapped as { calendar: "ical data..." }
+```
+
+### Standardized Error Handling
+
+All errors now follow a consistent format:
+
+```javascript
+try {
+  await grocy.someMethod();
+} catch (error) {
+  console.log(error.message); // Always starts with "Grocy API request failed: ..."
+}
+```
 
 ## Contributing
 

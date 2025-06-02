@@ -9,6 +9,13 @@ export default class Grocy {
    * @param {string} apiKey - Your Grocy API key
    */
   constructor(baseUrl, apiKey = null) {
+    if (typeof baseUrl !== 'string' || baseUrl.trim().length === 0) {
+      throw new Error('Base URL must be a non-empty string');
+    }
+    if (apiKey !== null && (typeof apiKey !== 'string' || apiKey.trim().length === 0)) {
+      throw new Error('API key must be a non-empty string or null');
+    }
+    
     this.baseUrl = baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
     this.apiKey = apiKey;
   }
@@ -18,6 +25,9 @@ export default class Grocy {
    * @param {string} apiKey - Your Grocy API key
    */
   setApiKey(apiKey) {
+    if (apiKey !== null && (typeof apiKey !== 'string' || apiKey.trim().length === 0)) {
+      throw new Error('API key must be a non-empty string or null');
+    }
     this.apiKey = apiKey;
   }
 
@@ -62,9 +72,9 @@ export default class Grocy {
     try {
       const response = await fetch(url, options);
 
-      // Handle non-JSON responses (like file downloads or no content)
+      // Handle 204 No Content responses consistently
       if (response.status === 204) {
-        return { success: true };
+        return Object.freeze({ success: true });
       }
 
       const contentType = response.headers.get('content-type');
@@ -75,13 +85,13 @@ export default class Grocy {
           throw new Error(jsonData.error_message || `HTTP error! status: ${response.status}`);
         }
 
-        return jsonData;
+        return Object.freeze(jsonData);
       } else if (contentType && contentType.includes('text/calendar')) {
         const textData = await response.text();
-        return { calendar: textData };
+        return Object.freeze({ calendar: textData });
       } else if (response.ok) {
-        // Handle binary responses or other non-JSON responses
-        return { success: true, response };
+        // Handle binary responses or other non-JSON responses consistently
+        return Object.freeze({ success: true, response });
       }
 
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -142,6 +152,10 @@ export default class Grocy {
    * @returns {Promise<Object>} - Stock entry details
    */
   async getStockEntry(entryId) {
+    if (!Number.isInteger(entryId) || entryId <= 0) {
+      throw new Error('Entry ID must be a positive integer');
+    }
+    
     return this.request(`/stock/entry/${entryId}`);
   }
 
@@ -170,6 +184,10 @@ export default class Grocy {
    * @returns {Promise<Object>} - Product details
    */
   async getProductDetails(productId) {
+    if (!Number.isInteger(productId) || productId <= 0) {
+      throw new Error('Product ID must be a positive integer');
+    }
+    
     return this.request(`/stock/products/${productId}`);
   }
 
@@ -179,6 +197,10 @@ export default class Grocy {
    * @returns {Promise<Object>} - Product details
    */
   async getProductByBarcode(barcode) {
+    if (typeof barcode !== 'string' || barcode.trim().length === 0) {
+      throw new Error('Barcode must be a non-empty string');
+    }
+    
     return this.request(`/stock/products/by-barcode/${barcode}`);
   }
 
@@ -189,6 +211,16 @@ export default class Grocy {
    * @returns {Promise<Array>} - Stock log entries
    */
   async addProductToStock(productId, data) {
+    if (!Number.isInteger(productId) || productId <= 0) {
+      throw new Error('Product ID must be a positive integer');
+    }
+    if (!data || typeof data !== 'object') {
+      throw new Error('Stock data must be a non-null object');
+    }
+    if (data.amount !== undefined && (typeof data.amount !== 'number' || data.amount <= 0)) {
+      throw new Error('Amount must be a positive number');
+    }
+    
     return this.request(`/stock/products/${productId}/add`, 'POST', data);
   }
 
@@ -209,6 +241,16 @@ export default class Grocy {
    * @returns {Promise<Array>} - Stock log entries
    */
   async consumeProduct(productId, data) {
+    if (!Number.isInteger(productId) || productId <= 0) {
+      throw new Error('Product ID must be a positive integer');
+    }
+    if (!data || typeof data !== 'object') {
+      throw new Error('Consumption data must be a non-null object');
+    }
+    if (data.amount !== undefined && (typeof data.amount !== 'number' || data.amount <= 0)) {
+      throw new Error('Amount must be a positive number');
+    }
+    
     return this.request(`/stock/products/${productId}/consume`, 'POST', data);
   }
 
@@ -413,6 +455,19 @@ export default class Grocy {
    * @returns {Promise<Object>} - Success status
    */
   async uploadFile(group, fileName, fileData) {
+    if (!this.apiKey) {
+      throw new Error('API key is required. Use setApiKey() to set it.');
+    }
+    if (typeof group !== 'string' || group.trim().length === 0) {
+      throw new Error('File group must be a non-empty string');
+    }
+    if (typeof fileName !== 'string' || fileName.trim().length === 0) {
+      throw new Error('File name must be a non-empty string');
+    }
+    if (!fileData) {
+      throw new Error('File data is required');
+    }
+
     const url = new URL(`${this.baseUrl}/files/${group}/${fileName}`);
 
     const options = {
@@ -431,9 +486,9 @@ export default class Grocy {
         throw new Error(errorData.error_message || `HTTP error! status: ${response.status}`);
       }
 
-      return { success: true };
+      return Object.freeze({ success: true });
     } catch (error) {
-      throw new Error(`Failed to upload file: ${error.message}`);
+      throw new Error(`Grocy API request failed: ${error.message}`);
     }
   }
 
