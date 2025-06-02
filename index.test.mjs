@@ -1162,16 +1162,16 @@ test('Validation functions', async (t) => {
 
   // Test ID validation
   await assert.rejects(() => client.getProductDetails('abc'), {
-    message: 'Product ID must be a positive integer',
+    message: 'Product ID must be a positive integer (received: "abc")',
   });
   await assert.rejects(() => client.getProductDetails(0), {
-    message: 'Product ID must be a positive integer',
+    message: 'Product ID must be a positive integer (received: 0)',
   });
   await assert.rejects(() => client.getProductDetails(-1), {
-    message: 'Product ID must be a positive integer',
+    message: 'Product ID must be a positive integer (received: -1)',
   });
   await assert.rejects(() => client.getProductDetails(1.5), {
-    message: 'Product ID must be a positive integer',
+    message: 'Product ID must be a positive integer (received: 1.5)',
   });
 
   // Test string validation
@@ -1242,7 +1242,7 @@ test('Validation functions', async (t) => {
         excluded_product_ids: [1, 'abc', 3],
       }),
     {
-      message: 'Product ID must be a positive integer',
+      message: 'Product ID must be a positive integer (received: "abc")',
     }
   );
 
@@ -1287,7 +1287,7 @@ test('Validation functions', async (t) => {
     message: 'Password is required and must be non-empty',
   });
   await assert.rejects(() => client.editUser('abc', {}), {
-    message: 'User ID must be a positive integer',
+    message: 'User ID must be a positive integer (received: "abc")',
   });
 
   // Test entity validation
@@ -1363,6 +1363,171 @@ test('Validation functions', async (t) => {
     }
   );
 
+  // Test validateDate with Date object
+  const fetchMockDate = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.addProductToStock(1, {
+    amount: 1,
+    best_before_date: new Date('2024-12-31'),
+  });
+  assert.strictEqual(fetchMockDate.mock.calls.length, 1);
+
+  // Test edge cases for number validation
+  await assert.rejects(() => client.addProductToStock(1, { amount: Infinity }), {
+    message: 'Amount must be a valid number',
+  });
+
+  await assert.rejects(() => client.addProductToStock(1, { amount: -Infinity }), {
+    message: 'Amount must be a valid number',
+  });
+
+  // Test precise number boundaries
+  await assert.rejects(() => client.addProductToStock(1, { amount: 0 }), {
+    message: 'Amount must be at least 0.001',
+  });
+
+  await assert.rejects(() => client.addProductToStock(1, { amount: 0.0009 }), {
+    message: 'Amount must be at least 0.001',
+  });
+
+  // Test valid amount at boundary
+  const fetchMockBoundary = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.addProductToStock(1, { amount: 0.001 });
+  assert.strictEqual(fetchMockBoundary.mock.calls.length, 1);
+
+  // Test max length edge cases
+  const exactMaxString = 'a'.repeat(200);
+  const fetchMockMaxString = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.getProductByBarcode(exactMaxString);
+  assert.strictEqual(fetchMockMaxString.mock.calls.length, 1);
+
+  // Test XSS prevention in string validation
+  const xssPayload = '<script>alert("XSS")</script>';
+  const fetchMockXSS = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.createUser({
+    username: 'testuser',
+    password: 'testpass',
+    first_name: xssPayload,
+  });
+  // The XSS payload should be escaped
+  const callBody = JSON.parse(fetchMockXSS.mock.calls[0].arguments[1].body);
+  assert.strictEqual(
+    callBody.first_name,
+    '&lt;script&gt;alert(&quot;XSS&quot;)&lt;&#x2F;script&gt;'
+  );
+
+  // Test that technical fields are NOT sanitized
+  const fetchMockTechnical = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  const technicalPassword = 'pass<word>with&special"chars';
+  await client.createUser({
+    username: 'testuser',
+    password: technicalPassword,
+    first_name: 'Test',
+  });
+  const technicalBody = JSON.parse(fetchMockTechnical.mock.calls[0].arguments[1].body);
+  assert.strictEqual(technicalBody.password, technicalPassword); // Password should NOT be escaped
+
+  // Test array validation with mixed types
+  await assert.rejects(
+    () =>
+      client.addRecipeProductsToShoppingList(1, {
+        excluded_product_ids: [1, 2, null, 4],
+      }),
+    {
+      message: 'Product ID must be a positive integer (received: null)',
+    }
+  );
+
+  // Test array validation with all valid items
+  const fetchMockArray = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.addRecipeProductsToShoppingList(1, {
+    excluded_product_ids: [1, 2, 3, 4, 5],
+  });
+  assert.strictEqual(fetchMockArray.mock.calls.length, 1);
+
+  // Test boolean edge cases
+  await assert.rejects(
+    () =>
+      client.consumeProduct(1, {
+        amount: 1,
+        spoiled: 1, // number instead of boolean
+      }),
+    {
+      message: 'Spoiled must be a boolean',
+    }
+  );
+
+  await assert.rejects(
+    () =>
+      client.consumeProduct(1, {
+        amount: 1,
+        spoiled: 'true', // string instead of boolean
+      }),
+    {
+      message: 'Spoiled must be a boolean',
+    }
+  );
+
+  // Test valid boolean values
+  const fetchMockBool = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.consumeProduct(1, {
+    amount: 1,
+    spoiled: true,
+  });
+  assert.strictEqual(fetchMockBool.mock.calls.length, 1);
+
+  const fetchMockBoolFalse = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.consumeProduct(1, {
+    amount: 1,
+    spoiled: false,
+  });
+  assert.strictEqual(fetchMockBoolFalse.mock.calls.length, 1);
+
+  // Test object validation edge cases
+  await assert.rejects(() => client.createUser('string'), {
+    message: 'User data must be a non-null object',
+  });
+
+  await assert.rejects(() => client.createUser([]), {
+    message: 'User data must be a non-null object',
+  });
+
+  // Test empty object detection for specific validations
+  await assert.rejects(() => client.createUser({}), {
+    message: 'Username is required and must be non-empty',
+  });
+
+  // Test URL validation edge cases
+  await assert.rejects(() => client.uploadFile('group', '../etc/passwd', new Uint8Array()), {
+    message: 'File name contains invalid characters',
+  });
+
+  await assert.rejects(() => client.uploadFile('group', 'file\x00name.jpg', new Uint8Array()), {
+    message: 'File name contains invalid characters',
+  });
+
+  // Test valid special characters in filenames
+  const fetchMockFilename = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.uploadFile('group', 'file-name_123.test.jpg', new Uint8Array([1, 2, 3]));
+  assert.strictEqual(fetchMockFilename.mock.calls.length, 1);
+
+  // Test number precision edge cases
+  const fetchMockPrecision = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.addProductToStock(1, { amount: 1.234567890123456 });
+  assert.strictEqual(fetchMockPrecision.mock.calls.length, 1);
+
+  // Test optional validation functions return null appropriately
+  const fetchMockOptionals = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.addProductToStock(1, {
+    amount: 1,
+    price: null,
+    best_before_date: undefined,
+    location_id: null,
+  });
+  const optionalBody = JSON.parse(fetchMockOptionals.mock.calls[0].arguments[1].body);
+  assert.strictEqual(optionalBody.price, null);
+  assert.strictEqual(optionalBody.best_before_date, null);
+  assert.strictEqual(optionalBody.location_id, null);
+
   // Test validateOptionalString with string
   const fetchMock5 = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
   await client.addProductToStock(1, { amount: 1, transaction_type: 'purchase' });
@@ -1380,7 +1545,7 @@ test('Validation functions', async (t) => {
 
   // Test more validation edge cases
   await assert.rejects(() => client.deleteUser(0), {
-    message: 'User ID must be a positive integer',
+    message: 'User ID must be a positive integer (received: 0)',
   });
 
   await assert.rejects(() => client.deleteFile(123, 'test.jpg'), {
@@ -1412,7 +1577,7 @@ test('Validation functions', async (t) => {
 
   // Test undoTask for more coverage
   await assert.rejects(() => client.undoTask('not-a-number'), {
-    message: 'Task ID must be a positive integer',
+    message: 'Task ID must be a positive integer (received: "not-a-number")',
   });
 
   // Test error path in request when no API key
@@ -1440,4 +1605,251 @@ test('Validation functions', async (t) => {
   assert.strictEqual(sentData.password, 'password123');
   // First name should be sanitized
   assert.strictEqual(sentData.first_name, '&lt;img src=x onerror=alert(&quot;xss&quot;)&gt;');
+});
+
+// Additional comprehensive edge case tests for validation functions
+test('Validation functions edge cases', async (t) => {
+  const client = new Grocy(BASE_URL, API_KEY);
+  const mockResponse = createMockResponse(200, []);
+
+  // Test validateId with edge cases
+  await assert.rejects(() => client.getProductDetails(-1), {
+    message: 'Product ID must be a positive integer (received: -1)',
+  });
+  await assert.rejects(() => client.getProductDetails(0), {
+    message: 'Product ID must be a positive integer (received: 0)',
+  });
+  await assert.rejects(() => client.getProductDetails(1.5), {
+    message: 'Product ID must be a positive integer (received: 1.5)',
+  });
+  await assert.rejects(() => client.getProductDetails(Infinity), {
+    message: 'Product ID must be a positive integer (received: null)',
+  });
+  await assert.rejects(() => client.getProductDetails(-Infinity), {
+    message: 'Product ID must be a positive integer (received: null)',
+  });
+
+  // Test validateNumber with edge cases
+  await assert.rejects(() => client.addProductToStock(1, { amount: -Infinity }), {
+    message: 'Amount must be a valid number',
+  });
+
+  // Test validateNumber with min/max boundaries
+  await assert.rejects(() => client.consumeProduct(1, { amount: -1 }), {
+    message: 'Amount must be at least 0.001',
+  });
+
+  // Test very small positive amounts below minimum
+  await assert.rejects(() => client.consumeProduct(1, { amount: 0.0001 }), {
+    message: 'Amount must be at least 0.001',
+  });
+
+  // Test that XSS patterns are properly escaped in user creation
+  const xssTestCases = [
+    {
+      input: '<script>alert("xss")</script>',
+      shouldBeEscaped: true,
+      shouldNotContain: ['<script>', '</script>'],
+    },
+    {
+      input: '<img src=x onerror=alert("xss")>',
+      shouldBeEscaped: true,
+      shouldNotContain: ['<img', '>'],
+    },
+    {
+      input: 'javascript:alert("xss")',
+      shouldBeEscaped: true,
+      // javascript: URLs don't have HTML to escape, so check it's unchanged
+      shouldEqual: 'javascript:alert(&quot;xss&quot;)',
+    },
+  ];
+
+  for (const testCase of xssTestCases) {
+    const fetchMock = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+    await client.createUser({
+      username: testCase.input,
+      password: 'password123',
+      first_name: 'Test',
+      last_name: 'User',
+    });
+    const [, options] = fetchMock.mock.calls[0].arguments;
+    const sentData = JSON.parse(options.body);
+
+    if (testCase.shouldBeEscaped) {
+      // Verify that some escaping happened
+      assert.ok(
+        sentData.username !== testCase.input,
+        'Username should be escaped and different from input'
+      );
+
+      // Check specific dangerous patterns are escaped
+      if (testCase.shouldNotContain) {
+        for (const pattern of testCase.shouldNotContain) {
+          assert.ok(
+            !sentData.username.includes(pattern),
+            `Username should not contain unescaped ${pattern}`
+          );
+        }
+      }
+
+      // Check for expected output if specified
+      if (testCase.shouldEqual) {
+        assert.strictEqual(
+          sentData.username,
+          testCase.shouldEqual,
+          'Username should match expected escaped value'
+        );
+      }
+    }
+  }
+
+  // Test validateDate with edge cases - invalid date strings
+  const invalidDateStrings = [
+    'not-a-date',
+    '2023-13-01', // Invalid month
+    '2023-01-32', // Invalid day
+  ];
+
+  for (const invalidDate of invalidDateStrings) {
+    await assert.rejects(
+      () => client.addProductToStock(1, { amount: 1, best_before_date: invalidDate }),
+      {
+        message: 'Best before date is not a valid date',
+      }
+    );
+  }
+
+  // Test validateDate with non-string/non-Date types
+  const invalidDateTypes = [
+    {}, // Object but not Date
+    [], // Array
+    true, // Boolean
+    123, // Number
+  ];
+
+  for (const invalidDate of invalidDateTypes) {
+    await assert.rejects(
+      () => client.addProductToStock(1, { amount: 1, best_before_date: invalidDate }),
+      {
+        message: 'Best before date must be a Date object or date string',
+      }
+    );
+  }
+
+  // Test valid date formats
+  const validDates = [new Date('2023-01-01'), '2023-01-01', new Date(2023, 0, 1)];
+
+  for (const validDate of validDates) {
+    const fetchMock = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+    await client.addProductToStock(1, { amount: 1, best_before_date: validDate });
+    assert.strictEqual(fetchMock.mock.calls.length, 1);
+  }
+
+  // Test validateBoolean edge cases
+  const nonBooleans = [0, 1, 'true', 'false', null, {}, []];
+  for (const nonBoolean of nonBooleans) {
+    await assert.rejects(() => client.consumeProduct(1, { amount: 1, spoiled: nonBoolean }), {
+      message: 'Spoiled must be a boolean',
+    });
+  }
+
+  // Test that undefined is allowed for optional boolean
+  const fetchMockBool = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.consumeProduct(1, { amount: 1, spoiled: undefined });
+  assert.strictEqual(fetchMockBool.mock.calls.length, 1);
+
+  // Test validateArray edge cases
+  await assert.rejects(
+    () => client.addRecipeProductsToShoppingList(1, { excluded_product_ids: 'not-an-array' }),
+    {
+      message: 'Excluded product IDs must be an array',
+    }
+  );
+
+  await assert.rejects(
+    () => client.addRecipeProductsToShoppingList(1, { excluded_product_ids: {} }),
+    {
+      message: 'Excluded product IDs must be an array',
+    }
+  );
+
+  // Test array with non-numeric elements
+  await assert.rejects(
+    () => client.addRecipeProductsToShoppingList(1, { excluded_product_ids: ['a', 'b'] }),
+    {
+      message: 'Product ID must be a positive integer (received: "a")',
+    }
+  );
+
+  // Test array with negative numbers
+  await assert.rejects(
+    () => client.addRecipeProductsToShoppingList(1, { excluded_product_ids: [1, -1, 3] }),
+    {
+      message: 'Product ID must be a positive integer (received: -1)',
+    }
+  );
+
+  // Test array with non-integers
+  await assert.rejects(
+    () => client.addRecipeProductsToShoppingList(1, { excluded_product_ids: [1, 2.5, 3] }),
+    {
+      message: 'Product ID must be a positive integer (received: 2.5)',
+    }
+  );
+
+  // Test string length validation after escaping
+  // The string "&" becomes "&amp;" after escaping (4 chars instead of 1)
+  const preEscapeString = '&'.repeat(50); // 50 chars before escaping
+  const fetchMockEscape = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.createUser({
+    username: preEscapeString,
+    password: 'password123',
+  });
+  const [, escapeOptions] = fetchMockEscape.mock.calls[0].arguments;
+  const escapedData = JSON.parse(escapeOptions.body);
+  // Each & becomes &amp; (5 chars), so 50 * 5 = 250 chars after escaping
+  assert.strictEqual(escapedData.username.length, 250, 'String should be escaped properly');
+
+  // Test validation with context in error messages
+  await assert.rejects(() => client.getProductDetails('invalid-id'), {
+    message: 'Product ID must be a positive integer (received: "invalid-id")',
+  });
+
+  // Test that technical fields are NOT escaped
+  const technicalFields = {
+    password: '<script>alert("xss")</script>',
+    api_key: '<script>alert("xss")</script>',
+  };
+
+  const fetchMockTech = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.createUser({
+    username: 'testuser',
+    password: technicalFields.password,
+  });
+  const [, techOptions] = fetchMockTech.mock.calls[0].arguments;
+  const techData = JSON.parse(techOptions.body);
+  assert.strictEqual(techData.password, technicalFields.password, 'Password should not be escaped');
+
+  // Test optional validation functions
+  const fetchMockOptional1 = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.addProductToStock(1, { amount: 1, location_id: null }); // null is valid for optional
+  assert.strictEqual(fetchMockOptional1.mock.calls.length, 1);
+
+  const fetchMockOptional2 = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.addProductToStock(1, { amount: 1, location_id: undefined }); // undefined is valid for optional
+  assert.strictEqual(fetchMockOptional2.mock.calls.length, 1);
+
+  // Test validateOptionalString with various inputs
+  const fetchMockOptStr = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.addProductToStock(1, { amount: 1, transaction_type: '' }); // empty string is valid for optional
+  assert.strictEqual(fetchMockOptStr.mock.calls.length, 1);
+
+  // Test edge case: Object.create(null) objects
+  // Object.create(null) actually creates a valid object, just without prototype
+  // It should work fine with our validation
+  const nullProtoObj = Object.create(null);
+  nullProtoObj.amount = 1;
+  const fetchMockNullProto = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.addProductToStock(1, nullProtoObj);
+  assert.strictEqual(fetchMockNullProto.mock.calls.length, 1);
 });

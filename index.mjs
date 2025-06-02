@@ -80,7 +80,9 @@ const USER_FIELDS = Object.freeze(new Set(['username', 'password', 'first_name',
  */
 function validateId(value, fieldName) {
   if (!Number.isInteger(value) || value <= 0) {
-    throw Object.freeze(new Error(`${fieldName} must be a positive integer`));
+    throw Object.freeze(
+      new Error(`${fieldName} must be a positive integer (received: ${JSON.stringify(value)})`)
+    );
   }
   return value;
 }
@@ -98,7 +100,7 @@ function validateId(value, fieldName) {
 function validateNumber(value, fieldName, options = {}) {
   const { min = 0, max } = Object.freeze(options);
 
-  if (typeof value !== 'number' || isNaN(value)) {
+  if (typeof value !== 'number' || isNaN(value) || !isFinite(value)) {
     throw Object.freeze(new Error(`${fieldName} must be a valid number`));
   }
 
@@ -124,6 +126,11 @@ function validateNumber(value, fieldName, options = {}) {
  * @param {boolean} options.sanitize - Whether to sanitize for XSS (default: true)
  * @returns {string} - The validated and optionally sanitized string
  * @throws {Error} - If the value is not a valid string
+ *
+ * NOTE: Length validation is performed BEFORE HTML escaping. This means that a string
+ * that passes maxLength validation may exceed that length after escaping.
+ * For example: "&" (1 char) becomes "&amp;" (5 chars) after escaping.
+ * This is intentional to validate user input length, not storage length.
  */
 function validateString(value, fieldName, options = {}) {
   const { required = true, maxLength = 255, minLength, sanitize = true } = Object.freeze(options);
@@ -469,7 +476,7 @@ export default class Grocy {
     // Validate inputs
     const validatedEntryId = validateId(entryId, 'Entry ID');
 
-    if (!data || typeof data !== 'object') {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw Object.freeze(new Error('Stock entry data must be a non-null object'));
     }
 
@@ -561,7 +568,7 @@ export default class Grocy {
     // Validate inputs
     const validatedProductId = validateId(productId, 'Product ID');
 
-    if (!data || typeof data !== 'object') {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw Object.freeze(new Error('Stock data must be a non-null object'));
     }
 
@@ -601,7 +608,7 @@ export default class Grocy {
       sanitize: false,
     });
 
-    if (!data || typeof data !== 'object') {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw Object.freeze(new Error('Stock data must be a non-null object'));
     }
 
@@ -640,7 +647,7 @@ export default class Grocy {
     // Validate inputs
     const validatedProductId = validateId(productId, 'Product ID');
 
-    if (!data || typeof data !== 'object') {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw Object.freeze(new Error('Consumption data must be a non-null object'));
     }
 
@@ -683,7 +690,7 @@ export default class Grocy {
       sanitize: false,
     });
 
-    if (!data || typeof data !== 'object') {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw Object.freeze(new Error('Consumption data must be a non-null object'));
     }
 
@@ -725,7 +732,7 @@ export default class Grocy {
     // Validate inputs
     const validatedProductId = validateId(productId, 'Product ID');
 
-    if (!data || typeof data !== 'object') {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw Object.freeze(new Error('Transfer data must be a non-null object'));
     }
 
@@ -758,7 +765,7 @@ export default class Grocy {
     // Validate inputs
     const validatedProductId = validateId(productId, 'Product ID');
 
-    if (!data || typeof data !== 'object') {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw Object.freeze(new Error('Inventory data must be a non-null object'));
     }
 
@@ -790,7 +797,7 @@ export default class Grocy {
     // Validate inputs
     const validatedProductId = validateId(productId, 'Product ID');
 
-    if (!data || typeof data !== 'object') {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw Object.freeze(new Error('Open data must be a non-null object'));
     }
 
@@ -858,7 +865,7 @@ export default class Grocy {
    */
   async addProductToShoppingList(data) {
     // Validate input
-    if (!data || typeof data !== 'object') {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw Object.freeze(new Error('Shopping list item data must be a non-null object'));
     }
 
@@ -886,7 +893,7 @@ export default class Grocy {
    */
   async removeProductFromShoppingList(data) {
     // Validate input
-    if (!data || typeof data !== 'object') {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw Object.freeze(new Error('Shopping list item data must be a non-null object'));
     }
 
@@ -949,7 +956,7 @@ export default class Grocy {
       sanitize: false,
     });
 
-    if (!data || typeof data !== 'object') {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw Object.freeze(new Error('Entity data must be a non-null object'));
     }
 
@@ -995,7 +1002,7 @@ export default class Grocy {
     });
     const validatedObjectId = validateId(objectId, 'Object ID');
 
-    if (!data || typeof data !== 'object') {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw Object.freeze(new Error('Entity data must be a non-null object'));
     }
 
@@ -1070,7 +1077,7 @@ export default class Grocy {
         ? validateId(objectId, 'Object ID')
         : validateString(objectId, 'Object ID', { minLength: 1, maxLength: 100 });
 
-    if (!data || typeof data !== 'object') {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw Object.freeze(new Error('Userfields data must be a non-null object'));
     }
 
@@ -1141,6 +1148,11 @@ export default class Grocy {
       minLength: 1,
       maxLength: 255,
     });
+
+    // Check for invalid characters in filename
+    if (validatedFileName.includes('..') || validatedFileName.includes('\x00')) {
+      throw Object.freeze(new Error('File name contains invalid characters'));
+    }
 
     if (!fileData) {
       throw Object.freeze(new Error('File data is required'));
@@ -1222,7 +1234,7 @@ export default class Grocy {
    */
   async createUser(data) {
     // Validate input
-    if (!data || typeof data !== 'object') {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw Object.freeze(new Error('User data must be a non-null object'));
     }
 
@@ -1357,7 +1369,7 @@ export default class Grocy {
       sanitize: false,
     });
 
-    if (!data || typeof data !== 'object') {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw Object.freeze(new Error('Setting data must be a non-null object'));
     }
 
