@@ -34,6 +34,7 @@ node-grocy/
 
 ⚠️ @.claude/knowledge-graph.md
 ⚠️ @.claude/host-system.md
+⚠️ @.claude/git-workflow.md
 
 ### Core Competencies
 - **Languages**: TypeScript (expert), JavaScript ES6+ (expert), Node.js internals
