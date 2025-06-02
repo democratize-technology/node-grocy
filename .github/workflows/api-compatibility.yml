@@ -33,7 +33,7 @@ jobs:
         npm ci
         # Install API analysis tools
         npm list jsdoc || npm install --save-dev jsdoc@latest
-        npm list @apidevtools/json-schema-ref-parser || npm install --save-dev @apidevtools/json-schema-ref-parser@latest
+        npm list "@apidevtools/json-schema-ref-parser" || npm install --save-dev "@apidevtools/json-schema-ref-parser@latest"
 
     - name: Extract Current API Surface
       run: |
