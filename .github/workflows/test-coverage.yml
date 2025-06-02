@@ -35,7 +35,7 @@ jobs:
       run: |
         npm ci
         # Install c8 for coverage if not present
-        npm list c8 || npm install --save-dev c8@latest
+        npm list c8 || npm install --no-save c8@latest
 
     - name: Run tests with coverage
       run: |

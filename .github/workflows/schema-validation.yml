@@ -31,9 +31,9 @@ jobs:
       run: |
         npm ci
         # Install schema validation tools
-        npm list zod || npm install --save-dev zod@latest
-        npm list ajv || npm install --save-dev ajv@latest
-        npm list @types/node || npm install --save-dev @types/node@latest
+        npm list zod || npm install --no-save zod@latest
+        npm list ajv || npm install --no-save ajv@latest
+        npm list @types/node || npm install --no-save @types/node@latest
 
     - name: Setup Schema Validation Environment
       run: |

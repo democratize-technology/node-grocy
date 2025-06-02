@@ -78,8 +78,8 @@ jobs:
         echo "🚨 Running immutability validation..."
         
         # Install ESLint if not available
-        npm list eslint || npm install --save-dev eslint@latest
-        npm list eslint-plugin-functional || npm install --save-dev eslint-plugin-functional@latest
+        npm list eslint || npm install --no-save eslint@latest
+        npm list eslint-plugin-functional || npm install --no-save eslint-plugin-functional@latest
         
         # Create minimal ESLint config for release validation
         cat > .eslintrc.release.json << 'EOF'
@@ -125,7 +125,7 @@ jobs:
         
         # If TypeScript build exists, run it
         if [ -f "tsconfig.json" ]; then
-          npm list typescript || npm install --save-dev typescript@latest
+          npm list typescript || npm install --no-save typescript@latest
           npx tsc --noEmit || echo "TypeScript check completed"
         fi
         

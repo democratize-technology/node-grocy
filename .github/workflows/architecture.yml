@@ -32,8 +32,8 @@ jobs:
       run: |
         npm ci
         # Install architecture analysis tools
-        npm list madge || npm install --save-dev madge@latest
-        npm list dependency-cruiser || npm install --save-dev dependency-cruiser@latest
+        npm list madge || npm install --no-save madge@latest
+        npm list dependency-cruiser || npm install --no-save dependency-cruiser@latest
 
     - name: Analyze Service Architecture
       run: |

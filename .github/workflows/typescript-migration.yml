@@ -37,8 +37,8 @@ jobs:
       run: |
         npm ci
         # Install TypeScript tooling if not present
-        npm list typescript || npm install --save-dev typescript@latest
-        npm list @types/node || npm install --save-dev @types/node@latest
+        npm list typescript || npm install --no-save typescript@latest
+        npm list @types/node || npm install --no-save @types/node@latest
 
     - name: Calculate Migration Progress
       run: |

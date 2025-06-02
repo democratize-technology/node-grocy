@@ -32,8 +32,8 @@ jobs:
       run: |
         npm ci
         # Install performance testing tools
-        npm list autocannon || npm install --save-dev autocannon@latest
-        npm list clinic || npm install --save-dev clinic@latest
+        npm list autocannon || npm install --no-save autocannon@latest
+        npm list clinic || npm install --no-save clinic@latest
 
     - name: Setup Performance Test Environment
       timeout-minutes: 10
