@@ -3,9 +3,36 @@
  * Grocy - A JavaScript wrapper for the Grocy REST API
  *
  * Authentication is done via API keys (header *GROCY-API-KEY* or same named query parameter)
+ *
+ * Note: The eslint-disable above allows parameter reassignment in validation functions only.
+ * This is a safe pattern as we're not mutating objects, just reassigning the parameter
+ * to its validated value for cleaner code. All data structures remain immutable.
  */
 
+import validator from 'validator';
+
 // Validation helper functions following immutable patterns
+
+/**
+ * Security Note: Input Sanitization Strategy
+ *
+ * This library is a REST API client that sends JSON payloads to the Grocy server.
+ * Security considerations:
+ *
+ * 1. SQL Injection: Not a concern here as this library doesn't construct SQL queries.
+ *    The Grocy server is responsible for parameterized queries.
+ *
+ * 2. XSS Prevention: We sanitize fields that are likely to be displayed in HTML:
+ *    - User-facing text fields (names, descriptions, notes) are escaped
+ *    - Configuration values (URLs, API keys, file paths) are NOT sanitized
+ *    - IDs and technical fields are NOT sanitized
+ *
+ * 3. The sanitize option in validateString() controls this behavior:
+ *    - sanitize: true (default) - Escapes HTML entities for XSS prevention
+ *    - sanitize: false - Returns raw input for technical fields
+ *
+ * This balanced approach prevents XSS while preserving functionality.
+ */
 
 /**
  * Validates that a value is a positive integer
@@ -57,11 +84,12 @@ function validateNumber(value, fieldName, options = {}) {
  * @param {boolean} options.required - Whether the string is required (default: true)
  * @param {number} options.maxLength - Maximum string length (default: 255)
  * @param {number} options.minLength - Minimum string length (optional)
- * @returns {string} - The validated string
+ * @param {boolean} options.sanitize - Whether to sanitize for XSS (default: true)
+ * @returns {string} - The validated and optionally sanitized string
  * @throws {Error} - If the value is not a valid string
  */
 function validateString(value, fieldName, options = {}) {
-  const { required = true, maxLength = 255, minLength } = Object.freeze(options);
+  const { required = true, maxLength = 255, minLength, sanitize = true } = Object.freeze(options);
 
   // Check type first
   if (value !== null && value !== undefined && typeof value !== 'string') {
@@ -86,7 +114,10 @@ function validateString(value, fieldName, options = {}) {
     throw Object.freeze(new Error(`${fieldName} must not exceed ${maxLength} characters`));
   }
 
-  return value;
+  // Apply XSS prevention by escaping HTML entities
+  // This prevents script injection while preserving the string for database storage
+  // The sanitize option can be disabled for fields that need raw input (e.g., passwords)
+  return sanitize ? validator.escape(value) : value;
 }
 
 /**
@@ -162,8 +193,8 @@ function validateOptionalDate(value, fieldName) {
  * Validates an optional string value
  * @param {*} value - The value to validate
  * @param {string} fieldName - The name of the field for error messages
- * @param {Object} options - Validation options
- * @returns {string|null} - The validated string or null
+ * @param {Object} options - Validation options (including sanitize)
+ * @returns {string|null} - The validated and optionally sanitized string or null
  * @throws {Error} - If the value is provided but not a valid string
  */
 function validateOptionalString(value, fieldName, options = {}) {
@@ -233,8 +264,13 @@ export default class Grocy {
    */
   constructor(baseUrl, apiKey = null) {
     // Validate inputs using immutable validation functions
-    const validatedBaseUrl = validateString(baseUrl, 'Base URL', { minLength: 1 });
-    const validatedApiKey = validateOptionalString(apiKey, 'API key', { minLength: 1 });
+    // Base URLs should not be sanitized as they are configuration values, not user input
+    const validatedBaseUrl = validateString(baseUrl, 'Base URL', { minLength: 1, sanitize: false });
+    // API keys should not be sanitized as they need exact values
+    const validatedApiKey = validateOptionalString(apiKey, 'API key', {
+      minLength: 1,
+      sanitize: false,
+    });
 
     // Immutable assignment
     this.baseUrl = Object.freeze(
@@ -249,7 +285,11 @@ export default class Grocy {
    */
   setApiKey(apiKey) {
     // Validate input using immutable validation function
-    const validatedApiKey = validateOptionalString(apiKey, 'API key', { minLength: 1 });
+    // API keys should not be sanitized as they need exact values
+    const validatedApiKey = validateOptionalString(apiKey, 'API key', {
+      minLength: 1,
+      sanitize: false,
+    });
 
     // Immutable assignment
     this.apiKey = validatedApiKey ? Object.freeze(validatedApiKey) : null;
@@ -398,6 +438,19 @@ export default class Grocy {
     }
 
     // Create immutable validated data - allow all fields to be updated
+    // Using Set for O(1) lookup performance as suggested in code review
+    const knownFields = Object.freeze(
+      new Set([
+        'amount',
+        'best_before_date',
+        'price',
+        'open',
+        'opened_date',
+        'location_id',
+        'shopping_location_id',
+      ])
+    );
+
     const validatedData = Object.freeze({
       amount:
         data.amount !== undefined ? validateNumber(data.amount, 'Amount', { min: 0 }) : undefined,
@@ -423,17 +476,7 @@ export default class Grocy {
           ? validateOptionalId(data.shopping_location_id, 'Shopping location ID')
           : undefined,
       ...Object.entries(data).reduce((acc, [key, value]) => {
-        if (
-          ![
-            'amount',
-            'best_before_date',
-            'price',
-            'open',
-            'opened_date',
-            'location_id',
-            'shopping_location_id',
-          ].includes(key)
-        ) {
+        if (!knownFields.has(key)) {
           acc[key] = value;
         }
         return acc;
@@ -477,7 +520,8 @@ export default class Grocy {
   async getProductByBarcode(barcode) {
     // Validate input
     // eslint-disable-next-line functional/immutable-data
-    barcode = validateString(barcode, 'Barcode', { minLength: 1, maxLength: 200 });
+    // Barcodes are technical identifiers that must be exact
+    barcode = validateString(barcode, 'Barcode', { minLength: 1, maxLength: 200, sanitize: false });
 
     return this.request(`/stock/products/by-barcode/${barcode}`);
   }
@@ -534,7 +578,8 @@ export default class Grocy {
    */
   async addProductToStockByBarcode(barcode, data) {
     // Validate inputs
-    barcode = validateString(barcode, 'Barcode', { minLength: 1, maxLength: 200 });
+    // Barcodes are technical identifiers that must be exact
+    barcode = validateString(barcode, 'Barcode', { minLength: 1, maxLength: 200, sanitize: false });
 
     if (!data || typeof data !== 'object') {
       throw Object.freeze(new Error('Stock data must be a non-null object'));
@@ -625,7 +670,8 @@ export default class Grocy {
    */
   async consumeProductByBarcode(barcode, data) {
     // Validate inputs
-    barcode = validateString(barcode, 'Barcode', { minLength: 1, maxLength: 200 });
+    // Barcodes are technical identifiers that must be exact
+    barcode = validateString(barcode, 'Barcode', { minLength: 1, maxLength: 200, sanitize: false });
 
     if (!data || typeof data !== 'object') {
       throw Object.freeze(new Error('Consumption data must be a non-null object'));
@@ -873,7 +919,12 @@ export default class Grocy {
    */
   async getObjects(entity, options = {}) {
     // Validate entity name
-    entity = validateString(entity, 'Entity name', { minLength: 1, maxLength: 50 });
+    // Entity names are technical identifiers that should not be sanitized
+    entity = validateString(entity, 'Entity name', {
+      minLength: 1,
+      maxLength: 50,
+      sanitize: false,
+    });
 
     const { query, order, limit, offset } = options;
     const params = Object.freeze({
@@ -894,7 +945,12 @@ export default class Grocy {
    */
   async addObject(entity, data) {
     // Validate inputs
-    entity = validateString(entity, 'Entity name', { minLength: 1, maxLength: 50 });
+    // Entity names are technical identifiers that should not be sanitized
+    entity = validateString(entity, 'Entity name', {
+      minLength: 1,
+      maxLength: 50,
+      sanitize: false,
+    });
 
     if (!data || typeof data !== 'object') {
       throw Object.freeze(new Error('Entity data must be a non-null object'));
@@ -914,7 +970,12 @@ export default class Grocy {
    */
   async getObject(entity, objectId) {
     // Validate inputs
-    entity = validateString(entity, 'Entity name', { minLength: 1, maxLength: 50 });
+    // Entity names are technical identifiers that should not be sanitized
+    entity = validateString(entity, 'Entity name', {
+      minLength: 1,
+      maxLength: 50,
+      sanitize: false,
+    });
     objectId = validateId(objectId, 'Object ID');
 
     return this.request(`/objects/${entity}/${objectId}`);
@@ -929,7 +990,12 @@ export default class Grocy {
    */
   async editObject(entity, objectId, data) {
     // Validate inputs
-    entity = validateString(entity, 'Entity name', { minLength: 1, maxLength: 50 });
+    // Entity names are technical identifiers that should not be sanitized
+    entity = validateString(entity, 'Entity name', {
+      minLength: 1,
+      maxLength: 50,
+      sanitize: false,
+    });
     objectId = validateId(objectId, 'Object ID');
 
     if (!data || typeof data !== 'object') {
@@ -950,7 +1016,12 @@ export default class Grocy {
    */
   async deleteObject(entity, objectId) {
     // Validate inputs
-    entity = validateString(entity, 'Entity name', { minLength: 1, maxLength: 50 });
+    // Entity names are technical identifiers that should not be sanitized
+    entity = validateString(entity, 'Entity name', {
+      minLength: 1,
+      maxLength: 50,
+      sanitize: false,
+    });
     objectId = validateId(objectId, 'Object ID');
 
     return this.request(`/objects/${entity}/${objectId}`, 'DELETE');
@@ -966,7 +1037,12 @@ export default class Grocy {
    */
   async getUserfields(entity, objectId) {
     // Validate inputs
-    entity = validateString(entity, 'Entity name', { minLength: 1, maxLength: 50 });
+    // Entity names are technical identifiers that should not be sanitized
+    entity = validateString(entity, 'Entity name', {
+      minLength: 1,
+      maxLength: 50,
+      sanitize: false,
+    });
     // Object ID can be string or number for userfields
     if (typeof objectId === 'number') {
       objectId = validateId(objectId, 'Object ID');
@@ -986,7 +1062,12 @@ export default class Grocy {
    */
   async setUserfields(entity, objectId, data) {
     // Validate inputs
-    entity = validateString(entity, 'Entity name', { minLength: 1, maxLength: 50 });
+    // Entity names are technical identifiers that should not be sanitized
+    entity = validateString(entity, 'Entity name', {
+      minLength: 1,
+      maxLength: 50,
+      sanitize: false,
+    });
     // Object ID can be string or number for userfields
     if (typeof objectId === 'number') {
       objectId = validateId(objectId, 'Object ID');
@@ -1014,9 +1095,13 @@ export default class Grocy {
    * @returns {Promise<Object>} - File data
    */
   async getFile(group, fileName, options = {}) {
-    // Validate inputs
-    group = validateString(group, 'File group', { minLength: 1, maxLength: 100 });
-    fileName = validateString(fileName, 'File name', { minLength: 1, maxLength: 255 });
+    // Validate inputs - file paths should not be sanitized
+    group = validateString(group, 'File group', { minLength: 1, maxLength: 100, sanitize: false });
+    fileName = validateString(fileName, 'File name', {
+      minLength: 1,
+      maxLength: 255,
+      sanitize: false,
+    });
 
     // Validate options if provided
     const validatedOptions = Object.freeze({
@@ -1085,9 +1170,13 @@ export default class Grocy {
    * @returns {Promise<Object>} - Success status
    */
   async deleteFile(group, fileName) {
-    // Validate inputs
-    group = validateString(group, 'File group', { minLength: 1, maxLength: 100 });
-    fileName = validateString(fileName, 'File name', { minLength: 1, maxLength: 255 });
+    // Validate inputs - file paths should not be sanitized
+    group = validateString(group, 'File group', { minLength: 1, maxLength: 100, sanitize: false });
+    fileName = validateString(fileName, 'File name', {
+      minLength: 1,
+      maxLength: 255,
+      sanitize: false,
+    });
 
     return this.request(`/files/${group}/${fileName}`, 'DELETE');
   }
@@ -1125,7 +1214,12 @@ export default class Grocy {
     // Create immutable validated data
     const validatedData = Object.freeze({
       username: validateString(data.username, 'Username', { minLength: 1, maxLength: 50 }),
-      password: validateString(data.password, 'Password', { minLength: 1, maxLength: 200 }),
+      // Passwords should not be sanitized as they need exact values
+      password: validateString(data.password, 'Password', {
+        minLength: 1,
+        maxLength: 200,
+        sanitize: false,
+      }),
       first_name: validateOptionalString(data.first_name, 'First name', { maxLength: 100 }),
       last_name: validateOptionalString(data.last_name, 'Last name', { maxLength: 100 }),
       ...Object.entries(data).reduce((acc, [key, value]) => {
@@ -1161,7 +1255,11 @@ export default class Grocy {
           : undefined,
       password:
         data.password !== undefined
-          ? validateString(data.password, 'Password', { minLength: 1, maxLength: 200 })
+          ? validateString(data.password, 'Password', {
+              minLength: 1,
+              maxLength: 200,
+              sanitize: false,
+            })
           : undefined,
       first_name:
         data.first_name !== undefined
@@ -1219,7 +1317,12 @@ export default class Grocy {
    */
   async getUserSetting(settingKey) {
     // Validate input
-    settingKey = validateString(settingKey, 'Setting key', { minLength: 1, maxLength: 100 });
+    // Setting keys are technical identifiers that should not be sanitized
+    settingKey = validateString(settingKey, 'Setting key', {
+      minLength: 1,
+      maxLength: 100,
+      sanitize: false,
+    });
 
     return this.request(`/user/settings/${settingKey}`);
   }
@@ -1232,7 +1335,12 @@ export default class Grocy {
    */
   async setUserSetting(settingKey, data) {
     // Validate inputs
-    settingKey = validateString(settingKey, 'Setting key', { minLength: 1, maxLength: 100 });
+    // Setting keys are technical identifiers that should not be sanitized
+    settingKey = validateString(settingKey, 'Setting key', {
+      minLength: 1,
+      maxLength: 100,
+      sanitize: false,
+    });
 
     if (!data || typeof data !== 'object') {
       throw Object.freeze(new Error('Setting data must be a non-null object'));

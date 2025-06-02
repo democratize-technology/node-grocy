@@ -1420,4 +1420,24 @@ test('Validation functions', async (t) => {
   await assert.rejects(() => clientNoApiKey2.addProductToStock(1, { amount: 1 }), {
     message: 'API key is required. Use setApiKey() to set it.',
   });
+
+  // Test XSS sanitization for user-facing fields
+  const fetchMock9 = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.createUser({
+    username: 'test<script>alert("xss")</script>',
+    password: 'password123',
+    first_name: '<img src=x onerror=alert("xss")>',
+  });
+  assert.strictEqual(fetchMock9.mock.calls.length, 1);
+  const [, createUserOptions] = fetchMock9.mock.calls[0].arguments;
+  const sentData = JSON.parse(createUserOptions.body);
+  // Username should be sanitized
+  assert.strictEqual(
+    sentData.username,
+    'test&lt;script&gt;alert(&quot;xss&quot;)&lt;&#x2F;script&gt;'
+  );
+  // Password should NOT be sanitized
+  assert.strictEqual(sentData.password, 'password123');
+  // First name should be sanitized
+  assert.strictEqual(sentData.first_name, '&lt;img src=x onerror=alert(&quot;xss&quot;)&gt;');
 });

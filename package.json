@@ -60,5 +60,8 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.1.0",
     "prettier": "^3.5.3"
+  },
+  "dependencies": {
+    "validator": "^13.15.15"
   }
 }
