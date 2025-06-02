@@ -2,43 +2,39 @@
   "root": true,
   "extends": [
     "eslint:recommended",
-    "plugin:@typescript-eslint/recommended",
-    "plugin:functional/external-recommended",
-    "plugin:functional/recommended"
+    "prettier"
   ],
   "plugins": [
-    "@typescript-eslint",
-    "functional"
+    "functional",
+    "jsdoc"
   ],
-  "parser": "@typescript-eslint/parser",
+  "parser": "espree",
   "parserOptions": {
     "ecmaVersion": 2022,
-    "sourceType": "module",
-    "project": "./tsconfig.json"
+    "sourceType": "module"
+  },
+  "env": {
+    "node": true,
+    "es2022": true
   },
   "rules": {
     "functional/immutable-data": "error",
     "functional/no-let": "error",
-    "functional/no-method-signature": "warn",
-    "functional/prefer-readonly-type": "error",
-    "functional/no-this-expression": "error",
-    "functional/no-class": "warn",
-    "functional/no-mixed-type": "error",
-    "functional/prefer-immutable-types": ["error", {
-      "enforcement": "ReadonlyDeep",
-      "ignoreInferredTypes": false
-    }],
-    "@typescript-eslint/no-explicit-any": "error",
-    "@typescript-eslint/explicit-function-return-type": "error",
-    "@typescript-eslint/no-non-null-assertion": "error",
-    "@typescript-eslint/strict-boolean-expressions": "error",
-    "no-console": "error",
+    "functional/prefer-readonly-type": "warn",
+    "no-console": "warn",
     "no-debugger": "error",
     "no-alert": "error",
     "prefer-const": "error",
     "no-var": "error",
     "eqeqeq": ["error", "always"],
     "curly": ["error", "all"],
+    "jsdoc/require-jsdoc": ["warn", {
+      "require": {
+        "FunctionDeclaration": true,
+        "MethodDefinition": true,
+        "ClassDeclaration": true
+      }
+    }],
     "no-restricted-syntax": [
       "error",
       {
@@ -74,10 +70,13 @@
   "overrides": [
     {
       "files": ["*.test.ts", "*.test.mjs"],
+      "env": {
+        "jest": true
+      },
       "rules": {
         "functional/no-let": "off",
         "functional/immutable-data": "off",
-        "@typescript-eslint/no-explicit-any": "off"
+        "jsdoc/require-jsdoc": "off"
       }
     }
   ]
