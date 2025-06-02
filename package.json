@@ -4,7 +4,13 @@
   "main": "index.mjs",
   "type": "module",
   "scripts": {
-    "test": "node --test index.test.mjs"
+    "test": "node --test index.test.mjs",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx,.mjs",
+    "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx,.mjs --fix",
+    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md,yml,yaml,mjs}\"",
+    "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,md,yml,yaml,mjs}\"",
+    "type-check": "tsc --noEmit",
+    "validate": "npm run lint && npm run format:check && npm run type-check && npm test"
   },
   "keywords": [
     "grocy",
@@ -32,5 +38,17 @@
   "homepage": "https://github.com/democratize-technology/node-grocy#readme",
   "engines": {
     "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^10.1.5",
+    "eslint-plugin-functional": "^6.6.3",
+    "eslint-plugin-jest": "^28.12.0",
+    "eslint-plugin-jsdoc": "^50.7.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.0",
+    "prettier": "^3.5.3"
   }
 }
