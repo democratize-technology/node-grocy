@@ -2,7 +2,7 @@ name: Documentation Generation
 
 on:
   push:
-    branches: [ main, feature/v1-refactoring ]
+    branches: [main, feature/v1-refactoring]
     paths:
       - 'src/**/*.ts'
       - 'src/**/*.js'
@@ -10,7 +10,7 @@ on:
       - 'README.md'
       - 'docs/**/*.md'
   pull_request:
-    branches: [ feature/v1-refactoring ]
+    branches: [feature/v1-refactoring]
     paths:
       - 'src/**/*.ts'
       - 'src/**/*.js'
@@ -25,669 +25,669 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  group: 'pages'
   cancel-in-progress: false
 
 jobs:
   generate-docs:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Use Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20.x'
-        cache: 'npm'
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
 
-    - name: Install dependencies
-      run: |
-        npm ci
-        # Install documentation tools
-        npm list typedoc || npm install --no-save typedoc@latest
-        npm list "typedoc-plugin-markdown" || npm install --no-save "typedoc-plugin-markdown@latest"
-        npm list jsdoc || npm install --no-save jsdoc@latest
+      - name: Install dependencies
+        run: |
+          npm ci
+          # Install documentation tools
+          npm list typedoc || npm install --no-save typedoc@latest
+          npm list "typedoc-plugin-markdown" || npm install --no-save "typedoc-plugin-markdown@latest"
+          npm list jsdoc || npm install --no-save jsdoc@latest
 
-    - name: Setup Documentation Environment
-      run: |
-        echo "📚 Setting up documentation generation environment..."
-        
-        # Create TypeDoc configuration
-        cat > typedoc.json << 'EOF'
-        {
-          "entryPoints": ["src/index.ts", "index.mjs"],
-          "out": "docs/api",
-          "theme": "default",
-          "includeVersion": true,
-          "excludePrivate": true,
-          "excludeProtected": false,
-          "excludeExternals": true,
-          "readme": "README.md",
-          "name": "node-grocy v1.0.0 API Documentation",
-          "tsconfig": "tsconfig.docs.json",
-          "plugin": ["typedoc-plugin-markdown"],
-          "gitRevision": "feature/v1-refactoring",
-          "categorizeByGroup": true,
-          "categoryOrder": [
-            "Services",
-            "Types",
-            "Interfaces",
-            "Utilities",
-            "*"
-          ],
-          "sort": ["source-order"],
-          "validation": {
-            "notExported": true,
-            "invalidLink": true,
-            "notDocumented": false
-          }
-        }
-        EOF
-        
-        # Create JSDoc configuration for current JS files
-        cat > jsdoc.conf.json << 'EOF'
-        {
-          "source": {
-            "include": ["./index.mjs", "./src/"],
-            "includePattern": "\\.(js|mjs)$",
-            "exclude": ["node_modules/"]
-          },
-          "opts": {
-            "destination": "./docs/current-api/",
-            "recurse": true
-          },
-          "plugins": ["plugins/markdown"],
-          "templates": {
-            "cleverLinks": false,
-            "monospaceLinks": false
-          },
-          "metadata": {
-            "title": "node-grocy Current API Documentation",
-            "version": "0.1.0"
-          }
-        }
-        EOF
+      - name: Setup Documentation Environment
+        run: |
+          echo "📚 Setting up documentation generation environment..."
 
-    - name: Extract API Documentation from Current Codebase
-      run: |
-        echo "📖 Extracting API documentation from current JavaScript codebase..."
-        
-        # Create API extraction script
-        cat > extract-api-docs.mjs << 'EOF'
-        import fs from 'fs';
-        import path from 'path';
-        
-        function extractAPIDocumentation() {
-          const apiDocs = {
-            title: 'node-grocy API Reference',
-            version: '0.1.0 → 1.0.0',
-            lastUpdated: new Date().toISOString(),
-            classes: [],
-            methods: [],
-            migration: {}
-          };
-          
-          // Read index.mjs to extract API
-          if (fs.existsSync('index.mjs')) {
-            const content = fs.readFileSync('index.mjs', 'utf8');
-            
-            // Extract class definitions with JSDoc
-            const classMatches = content.match(/\/\*\*[\s\S]*?\*\/\s*(?:export\s+)?class\s+(\w+)/g);
-            if (classMatches) {
-              classMatches.forEach(match => {
-                const className = match.match(/class\s+(\w+)/)[1];
-                const jsDoc = match.match(/\/\*\*([\s\S]*?)\*\//);
-                
-                apiDocs.classes.push({
-                  name: className,
-                  description: jsDoc ? jsDoc[1].replace(/\s*\*\s?/g, ' ').trim() : 'Main Grocy API client',
-                  type: 'class'
-                });
-              });
-            }
-            
-            // Extract method definitions
-            const methodMatches = content.match(/\/\*\*[\s\S]*?\*\/\s*(?:async\s+)?(\w+)\s*\([^)]*\)/g);
-            if (methodMatches) {
-              methodMatches.forEach(match => {
-                const methodName = match.match(/(?:async\s+)?(\w+)\s*\(/)[1];
-                const jsDoc = match.match(/\/\*\*([\s\S]*?)\*\//);
-                
-                if (methodName !== 'constructor') {
-                  apiDocs.methods.push({
-                    name: methodName,
-                    description: jsDoc ? jsDoc[1].replace(/\s*\*\s?/g, ' ').trim() : `${methodName} method`,
-                    type: 'method',
-                    isAsync: match.includes('async')
-                  });
-                }
-              });
+          # Create TypeDoc configuration
+          cat > typedoc.json << 'EOF'
+          {
+            "entryPoints": ["src/index.ts", "index.mjs"],
+            "out": "docs/api",
+            "theme": "default",
+            "includeVersion": true,
+            "excludePrivate": true,
+            "excludeProtected": false,
+            "excludeExternals": true,
+            "readme": "README.md",
+            "name": "node-grocy v1.0.0 API Documentation",
+            "tsconfig": "tsconfig.docs.json",
+            "plugin": ["typedoc-plugin-markdown"],
+            "gitRevision": "feature/v1-refactoring",
+            "categorizeByGroup": true,
+            "categoryOrder": [
+              "Services",
+              "Types",
+              "Interfaces",
+              "Utilities",
+              "*"
+            ],
+            "sort": ["source-order"],
+            "validation": {
+              "notExported": true,
+              "invalidLink": true,
+              "notDocumented": false
             }
           }
-          
-          return apiDocs;
-        }
-        
-        function generateMarkdownDocs(apiDocs) {
-          let markdown = `# ${apiDocs.title}\n\n`;
-          markdown += `**Version**: ${apiDocs.version}\n`;
-          markdown += `**Last Updated**: ${new Date(apiDocs.lastUpdated).toLocaleDateString()}\n\n`;
-          
-          markdown += `> **Note**: This documentation is automatically generated during the v1.0.0 refactoring process.\n\n`;
-          
-          markdown += `## Table of Contents\n\n`;
-          markdown += `- [Classes](#classes)\n`;
-          markdown += `- [Methods](#methods)\n`;
-          markdown += `- [Migration Guide](#migration-guide)\n\n`;
-          
-          // Classes section
-          markdown += `## Classes\n\n`;
-          if (apiDocs.classes.length > 0) {
-            apiDocs.classes.forEach(cls => {
-              markdown += `### ${cls.name}\n\n`;
-              markdown += `${cls.description}\n\n`;
-              markdown += `**Type**: \`${cls.type}\`\n\n`;
-            });
-          } else {
-            markdown += `*No classes documented yet. This will be populated as the TypeScript migration progresses.*\n\n`;
-          }
-          
-          // Methods section
-          markdown += `## Methods\n\n`;
-          if (apiDocs.methods.length > 0) {
-            apiDocs.methods.forEach(method => {
-              markdown += `### ${method.name}${method.isAsync ? ' (async)' : ''}\n\n`;
-              markdown += `${method.description}\n\n`;
-              markdown += `**Type**: \`${method.type}\`\n`;
-              if (method.isAsync) {
-                markdown += `**Returns**: \`Promise\`\n`;
-              }
-              markdown += `\n`;
-            });
-          } else {
-            markdown += `*Methods documentation will be generated from TypeScript definitions.*\n\n`;
-          }
-          
-          // Migration guide
-          markdown += `## Migration Guide\n\n`;
-          markdown += `### v0.1.0 → v1.0.0 Changes\n\n`;
-          markdown += `This section will be updated as the migration progresses:\n\n`;
-          markdown += `- **Immutability**: All APIs now return immutable objects\n`;
-          markdown += `- **TypeScript**: Full TypeScript support with type definitions\n`;
-          markdown += `- **Modular Architecture**: Service-based architecture\n`;
-          markdown += `- **Error Handling**: Comprehensive error types and handling\n`;
-          markdown += `- **Validation**: Input validation with Zod schemas\n\n`;
-          
-          markdown += `### Breaking Changes\n\n`;
-          markdown += `*Breaking changes will be documented here as they are identified.*\n\n`;
-          
-          markdown += `### Compatibility Layer\n\n`;
-          markdown += `A compatibility layer will be provided to ease migration from v0.1.0 to v1.0.0.\n\n`;
-          
-          return markdown;
-        }
-        
-        // Generate documentation
-        const apiDocs = extractAPIDocumentation();
-        const markdown = generateMarkdownDocs(apiDocs);
-        
-        // Ensure docs directory exists
-        if (!fs.existsSync('docs')) {
-          fs.mkdirSync('docs', { recursive: true });
-        }
-        
-        // Write API documentation
-        fs.writeFileSync('docs/api-reference.md', markdown);
-        fs.writeFileSync('api-docs.json', JSON.stringify(apiDocs, null, 2));
-        
-        console.log('API documentation generated successfully');
-        console.log(`- Classes found: ${apiDocs.classes.length}`);
-        console.log(`- Methods found: ${apiDocs.methods.length}`);
-        EOF
-        
-        node extract-api-docs.mjs
+          EOF
 
-    - name: Generate TypeScript Documentation
-      timeout-minutes: 10
-      run: |
-        echo "📘 Generating TypeScript documentation..."
-        
-        # Check if TypeScript files exist
-        if find src -name "*.ts" 2>/dev/null | grep -q .; then
-          echo "TypeScript files found, generating TypeDoc documentation..."
-          
-          # Generate TypeScript configuration for documentation
-          echo "Creating tsconfig.docs.json for documentation..."
-          cat > tsconfig.docs.json << 'EOF'
-        {
-          "compilerOptions": {
-            "target": "ES2022",
-            "module": "ESNext",
-            "moduleResolution": "node",
-            "lib": ["ES2022"],
-            "outDir": "./dist",
-            "rootDir": "./src",
-            "strict": true,
-            "esModuleInterop": true,
-            "skipLibCheck": true,
-            "forceConsistentCasingInFileNames": true
-          },
-          "include": [
-            "src/**/*"
-          ],
-          "exclude": [
-            "node_modules",
-            "dist",
-            "**/*.test.*"
-          ]
-        }
-        EOF
-          
-          # Generate TypeDoc documentation
-          npx typedoc || echo "TypeDoc generation completed with warnings"
-        else
-          echo "No TypeScript files found, skipping TypeDoc generation"
-          mkdir -p docs/api
-          echo "# TypeScript Documentation\n\nTypeScript files will be documented here as the migration progresses." > docs/api/README.md
-        fi
-
-    - name: Generate Current API Documentation
-      timeout-minutes: 5
-      run: |
-        echo "📝 Generating current JavaScript API documentation..."
-        
-        # Generate JSDoc documentation for current codebase
-        npx jsdoc -c jsdoc.conf.json || echo "JSDoc generation completed"
-
-    - name: Create Documentation Index
-      run: |
-        echo "📋 Creating documentation index..."
-        
-        cat > docs/README.md << 'EOF'
-        # node-grocy Documentation
-        
-        Welcome to the node-grocy documentation hub for v1.0.0 development.
-        
-        ## Documentation Structure
-        
-        ### Current Version (v0.1.0)
-        - [Current API Reference](./current-api/) - JavaScript API documentation
-        - [API Reference Markdown](./api-reference.md) - Markdown format API docs
-        
-        ### Future Version (v1.0.0)
-        - [TypeScript API Reference](./api/) - TypeScript API documentation (generated as migration progresses)
-        - [Migration Guide](./migration-guide.md) - v0.1.0 → v1.0.0 migration instructions
-        
-        ## Development Documentation
-        - [Contributing Guidelines](../.github/CONTRIBUTING.md) - How to contribute
-        - [Architecture Documentation](./architecture.md) - System architecture
-        - [Git Workflow](./git-workflow.md) - Development workflow
-        
-        ## External Resources
-        - [Grocy API Documentation](https://demo.grocy.info/api)
-        - [GitHub Repository](https://github.com/democratize-technology/node-grocy)
-        
-        ---
-        
-        **Auto-generated on**: $(date)
-        **Branch**: feature/v1-refactoring
-        **Status**: v1.0.0 refactoring in progress
-        EOF
-
-    - name: Create Migration Guide
-      run: |
-        echo "🔄 Creating migration guide..."
-        
-        cat > docs/migration-guide.md << 'EOF'
-        # Migration Guide: v0.1.0 → v1.0.0
-        
-        This guide helps you migrate from node-grocy v0.1.0 to v1.0.0.
-        
-        ## Overview
-        
-        node-grocy v1.0.0 represents a complete architectural transformation:
-        - **JavaScript → TypeScript**: Full type safety
-        - **Monolithic → Modular**: Service-based architecture
-        - **Mutable → Immutable**: All data operations are immutable
-        - **Basic → Enterprise**: Comprehensive error handling and validation
-        
-        ## Breaking Changes
-        
-        ### 1. Immutability Requirements
-        
-        **v0.1.0 (Mutable)**:
-        ```javascript
-        const products = await client.getProducts();
-        products.push(newProduct); // Mutates original array
-        ```
-        
-        **v1.0.0 (Immutable)**:
-        ```typescript
-        const products = await client.getProducts();
-        const updatedProducts = [...products, newProduct]; // Creates new array
-        ```
-        
-        ### 2. TypeScript Integration
-        
-        **v0.1.0**:
-        ```javascript
-        const client = new GrocyClient(url, apiKey);
-        const result = await client.getStock(); // No type information
-        ```
-        
-        **v1.0.0**:
-        ```typescript
-        import { GrocyClient, StockEntry } from 'node-grocy';
-        
-        const client = new GrocyClient({ apiUrl: url, apiKey });
-        const result: ReadonlyArray<StockEntry> = await client.stock.getAll();
-        ```
-        
-        ### 3. Service-Based Architecture
-        
-        **v0.1.0**:
-        ```javascript
-        await client.addToStock(productId, amount);
-        await client.addToShoppingList(productId, amount);
-        ```
-        
-        **v1.0.0**:
-        ```typescript
-        await client.stock.add(productId, amount);
-        await client.shoppingList.addItem(productId, amount);
-        ```
-        
-        ### 4. Error Handling
-        
-        **v0.1.0**:
-        ```javascript
-        try {
-          const result = await client.getProducts();
-        } catch (error) {
-          // Generic error handling
-        }
-        ```
-        
-        **v1.0.0**:
-        ```typescript
-        import { GrocyAuthenticationError, GrocyValidationError } from 'node-grocy';
-        
-        try {
-          const result = await client.products.getAll();
-        } catch (error) {
-          if (error instanceof GrocyAuthenticationError) {
-            // Handle auth errors
-          } else if (error instanceof GrocyValidationError) {
-            // Handle validation errors
-          }
-        }
-        ```
-        
-        ## Migration Steps
-        
-        ### Step 1: Update Dependencies
-        
-        ```bash
-        npm uninstall node-grocy@0.1.0
-        npm install node-grocy@1.0.0
-        ```
-        
-        ### Step 2: Add TypeScript Support (Optional)
-        
-        ```bash
-        npm install --save-dev typescript @types/node
-        npx tsc --init
-        ```
-        
-        ### Step 3: Update Import Statements
-        
-        **Before**:
-        ```javascript
-        const GrocyClient = require('node-grocy');
-        ```
-        
-        **After**:
-        ```typescript
-        import { GrocyClient } from 'node-grocy';
-        // or
-        const { GrocyClient } = require('node-grocy');
-        ```
-        
-        ### Step 4: Update Client Initialization
-        
-        **Before**:
-        ```javascript
-        const client = new GrocyClient('https://grocy.example.com', 'your-api-key');
-        ```
-        
-        **After**:
-        ```typescript
-        const client = new GrocyClient({
-          apiUrl: 'https://grocy.example.com',
-          apiKey: 'your-api-key'
-        });
-        ```
-        
-        ### Step 5: Update Method Calls
-        
-        Use the service-based approach and ensure immutability:
-        
-        **Before**:
-        ```javascript
-        const stock = await client.getStock();
-        stock.forEach(item => item.processed = true); // Mutation!
-        ```
-        
-        **After**:
-        ```typescript
-        const stock = await client.stock.getAll();
-        const processedStock = stock.map(item => ({ ...item, processed: true }));
-        ```
-        
-        ## Compatibility Layer
-        
-        For gradual migration, v1.0.0 provides a compatibility layer:
-        
-        ```typescript
-        import { LegacyGrocyClient } from 'node-grocy/compat';
-        
-        // Works with v0.1.0 API but with v1.0.0 benefits
-        const client = new LegacyGrocyClient(url, apiKey);
-        ```
-        
-        ## Testing Your Migration
-        
-        1. **Type Checking**: Ensure TypeScript compilation succeeds
-        2. **Immutability**: Run ESLint with functional rules
-        3. **Functionality**: Test all API calls work as expected
-        4. **Performance**: Compare performance with v0.1.0
-        
-        ## Getting Help
-        
-        - [GitHub Issues](https://github.com/democratize-technology/node-grocy/issues)
-        - [Documentation](./README.md)
-        - [Contributing Guide](../.github/CONTRIBUTING.md)
-        
-        ---
-        
-        **Last Updated**: $(date)
-        **Status**: Work in progress
-        EOF
-
-    - name: Generate Documentation Statistics
-      run: |
-        echo "📊 Generating documentation statistics..."
-        
-        cat > docs-stats.mjs << 'EOF'
-        import fs from 'fs';
-        import path from 'path';
-        
-        function analyzeDocumentation() {
-          const stats = {
-            timestamp: new Date().toISOString(),
-            files: {
-              markdown: 0,
-              html: 0,
-              json: 0
+          # Create JSDoc configuration for current JS files
+          cat > jsdoc.conf.json << 'EOF'
+          {
+            "source": {
+              "include": ["./index.mjs", "./src/"],
+              "includePattern": "\\.(js|mjs)$",
+              "exclude": ["node_modules/"]
             },
-            content: {
-              totalLines: 0,
-              totalWords: 0,
-              avgWordsPerFile: 0
+            "opts": {
+              "destination": "./docs/current-api/",
+              "recurse": true
             },
-            coverage: {
-              apiMethods: 0,
-              documentedMethods: 0,
-              coveragePercentage: 0
+            "plugins": ["plugins/markdown"],
+            "templates": {
+              "cleverLinks": false,
+              "monospaceLinks": false
+            },
+            "metadata": {
+              "title": "node-grocy Current API Documentation",
+              "version": "0.1.0"
             }
-          };
-          
-          // Count documentation files
-          function countFiles(dir, stats) {
-            if (!fs.existsSync(dir)) return;
+          }
+          EOF
+
+      - name: Extract API Documentation from Current Codebase
+        run: |
+          echo "📖 Extracting API documentation from current JavaScript codebase..."
+
+          # Create API extraction script
+          cat > extract-api-docs.mjs << 'EOF'
+          import fs from 'fs';
+          import path from 'path';
+
+          function extractAPIDocumentation() {
+            const apiDocs = {
+              title: 'node-grocy API Reference',
+              version: '0.1.0 → 1.0.0',
+              lastUpdated: new Date().toISOString(),
+              classes: [],
+              methods: [],
+              migration: {}
+            };
             
-            const items = fs.readdirSync(dir, { withFileTypes: true });
-            
-            for (const item of items) {
-              const fullPath = path.join(dir, item.name);
+            // Read index.mjs to extract API
+            if (fs.existsSync('index.mjs')) {
+              const content = fs.readFileSync('index.mjs', 'utf8');
               
-              if (item.isDirectory()) {
-                countFiles(fullPath, stats);
-              } else {
-                const ext = path.extname(item.name).toLowerCase();
+              // Extract class definitions with JSDoc
+              const classMatches = content.match(/\/\*\*[\s\S]*?\*\/\s*(?:export\s+)?class\s+(\w+)/g);
+              if (classMatches) {
+                classMatches.forEach(match => {
+                  const className = match.match(/class\s+(\w+)/)[1];
+                  const jsDoc = match.match(/\/\*\*([\s\S]*?)\*\//);
+                  
+                  apiDocs.classes.push({
+                    name: className,
+                    description: jsDoc ? jsDoc[1].replace(/\s*\*\s?/g, ' ').trim() : 'Main Grocy API client',
+                    type: 'class'
+                  });
+                });
+              }
+              
+              // Extract method definitions
+              const methodMatches = content.match(/\/\*\*[\s\S]*?\*\/\s*(?:async\s+)?(\w+)\s*\([^)]*\)/g);
+              if (methodMatches) {
+                methodMatches.forEach(match => {
+                  const methodName = match.match(/(?:async\s+)?(\w+)\s*\(/)[1];
+                  const jsDoc = match.match(/\/\*\*([\s\S]*?)\*\//);
+                  
+                  if (methodName !== 'constructor') {
+                    apiDocs.methods.push({
+                      name: methodName,
+                      description: jsDoc ? jsDoc[1].replace(/\s*\*\s?/g, ' ').trim() : `${methodName} method`,
+                      type: 'method',
+                      isAsync: match.includes('async')
+                    });
+                  }
+                });
+              }
+            }
+            
+            return apiDocs;
+          }
+
+          function generateMarkdownDocs(apiDocs) {
+            let markdown = `# ${apiDocs.title}\n\n`;
+            markdown += `**Version**: ${apiDocs.version}\n`;
+            markdown += `**Last Updated**: ${new Date(apiDocs.lastUpdated).toLocaleDateString()}\n\n`;
+            
+            markdown += `> **Note**: This documentation is automatically generated during the v1.0.0 refactoring process.\n\n`;
+            
+            markdown += `## Table of Contents\n\n`;
+            markdown += `- [Classes](#classes)\n`;
+            markdown += `- [Methods](#methods)\n`;
+            markdown += `- [Migration Guide](#migration-guide)\n\n`;
+            
+            // Classes section
+            markdown += `## Classes\n\n`;
+            if (apiDocs.classes.length > 0) {
+              apiDocs.classes.forEach(cls => {
+                markdown += `### ${cls.name}\n\n`;
+                markdown += `${cls.description}\n\n`;
+                markdown += `**Type**: \`${cls.type}\`\n\n`;
+              });
+            } else {
+              markdown += `*No classes documented yet. This will be populated as the TypeScript migration progresses.*\n\n`;
+            }
+            
+            // Methods section
+            markdown += `## Methods\n\n`;
+            if (apiDocs.methods.length > 0) {
+              apiDocs.methods.forEach(method => {
+                markdown += `### ${method.name}${method.isAsync ? ' (async)' : ''}\n\n`;
+                markdown += `${method.description}\n\n`;
+                markdown += `**Type**: \`${method.type}\`\n`;
+                if (method.isAsync) {
+                  markdown += `**Returns**: \`Promise\`\n`;
+                }
+                markdown += `\n`;
+              });
+            } else {
+              markdown += `*Methods documentation will be generated from TypeScript definitions.*\n\n`;
+            }
+            
+            // Migration guide
+            markdown += `## Migration Guide\n\n`;
+            markdown += `### v0.1.0 → v1.0.0 Changes\n\n`;
+            markdown += `This section will be updated as the migration progresses:\n\n`;
+            markdown += `- **Immutability**: All APIs now return immutable objects\n`;
+            markdown += `- **TypeScript**: Full TypeScript support with type definitions\n`;
+            markdown += `- **Modular Architecture**: Service-based architecture\n`;
+            markdown += `- **Error Handling**: Comprehensive error types and handling\n`;
+            markdown += `- **Validation**: Input validation with Zod schemas\n\n`;
+            
+            markdown += `### Breaking Changes\n\n`;
+            markdown += `*Breaking changes will be documented here as they are identified.*\n\n`;
+            
+            markdown += `### Compatibility Layer\n\n`;
+            markdown += `A compatibility layer will be provided to ease migration from v0.1.0 to v1.0.0.\n\n`;
+            
+            return markdown;
+          }
+
+          // Generate documentation
+          const apiDocs = extractAPIDocumentation();
+          const markdown = generateMarkdownDocs(apiDocs);
+
+          // Ensure docs directory exists
+          if (!fs.existsSync('docs')) {
+            fs.mkdirSync('docs', { recursive: true });
+          }
+
+          // Write API documentation
+          fs.writeFileSync('docs/api-reference.md', markdown);
+          fs.writeFileSync('api-docs.json', JSON.stringify(apiDocs, null, 2));
+
+          console.log('API documentation generated successfully');
+          console.log(`- Classes found: ${apiDocs.classes.length}`);
+          console.log(`- Methods found: ${apiDocs.methods.length}`);
+          EOF
+
+          node extract-api-docs.mjs
+
+      - name: Generate TypeScript Documentation
+        timeout-minutes: 10
+        run: |
+          echo "📘 Generating TypeScript documentation..."
+
+          # Check if TypeScript files exist
+          if find src -name "*.ts" 2>/dev/null | grep -q .; then
+            echo "TypeScript files found, generating TypeDoc documentation..."
+            
+            # Generate TypeScript configuration for documentation
+            echo "Creating tsconfig.docs.json for documentation..."
+            cat > tsconfig.docs.json << 'EOF'
+          {
+            "compilerOptions": {
+              "target": "ES2022",
+              "module": "ESNext",
+              "moduleResolution": "node",
+              "lib": ["ES2022"],
+              "outDir": "./dist",
+              "rootDir": "./src",
+              "strict": true,
+              "esModuleInterop": true,
+              "skipLibCheck": true,
+              "forceConsistentCasingInFileNames": true
+            },
+            "include": [
+              "src/**/*"
+            ],
+            "exclude": [
+              "node_modules",
+              "dist",
+              "**/*.test.*"
+            ]
+          }
+          EOF
+            
+            # Generate TypeDoc documentation
+            npx typedoc || echo "TypeDoc generation completed with warnings"
+          else
+            echo "No TypeScript files found, skipping TypeDoc generation"
+            mkdir -p docs/api
+            echo "# TypeScript Documentation\n\nTypeScript files will be documented here as the migration progresses." > docs/api/README.md
+          fi
+
+      - name: Generate Current API Documentation
+        timeout-minutes: 5
+        run: |
+          echo "📝 Generating current JavaScript API documentation..."
+
+          # Generate JSDoc documentation for current codebase
+          npx jsdoc -c jsdoc.conf.json || echo "JSDoc generation completed"
+
+      - name: Create Documentation Index
+        run: |
+          echo "📋 Creating documentation index..."
+
+          cat > docs/README.md << 'EOF'
+          # node-grocy Documentation
+
+          Welcome to the node-grocy documentation hub for v1.0.0 development.
+
+          ## Documentation Structure
+
+          ### Current Version (v0.1.0)
+          - [Current API Reference](./current-api/) - JavaScript API documentation
+          - [API Reference Markdown](./api-reference.md) - Markdown format API docs
+
+          ### Future Version (v1.0.0)
+          - [TypeScript API Reference](./api/) - TypeScript API documentation (generated as migration progresses)
+          - [Migration Guide](./migration-guide.md) - v0.1.0 → v1.0.0 migration instructions
+
+          ## Development Documentation
+          - [Contributing Guidelines](../.github/CONTRIBUTING.md) - How to contribute
+          - [Architecture Documentation](./architecture.md) - System architecture
+          - [Git Workflow](./git-workflow.md) - Development workflow
+
+          ## External Resources
+          - [Grocy API Documentation](https://demo.grocy.info/api)
+          - [GitHub Repository](https://github.com/democratize-technology/node-grocy)
+
+          ---
+
+          **Auto-generated on**: $(date)
+          **Branch**: feature/v1-refactoring
+          **Status**: v1.0.0 refactoring in progress
+          EOF
+
+      - name: Create Migration Guide
+        run: |
+          echo "🔄 Creating migration guide..."
+
+          cat > docs/migration-guide.md << 'EOF'
+          # Migration Guide: v0.1.0 → v1.0.0
+
+          This guide helps you migrate from node-grocy v0.1.0 to v1.0.0.
+
+          ## Overview
+
+          node-grocy v1.0.0 represents a complete architectural transformation:
+          - **JavaScript → TypeScript**: Full type safety
+          - **Monolithic → Modular**: Service-based architecture
+          - **Mutable → Immutable**: All data operations are immutable
+          - **Basic → Enterprise**: Comprehensive error handling and validation
+
+          ## Breaking Changes
+
+          ### 1. Immutability Requirements
+
+          **v0.1.0 (Mutable)**:
+          ```javascript
+          const products = await client.getProducts();
+          products.push(newProduct); // Mutates original array
+          ```
+
+          **v1.0.0 (Immutable)**:
+          ```typescript
+          const products = await client.getProducts();
+          const updatedProducts = [...products, newProduct]; // Creates new array
+          ```
+
+          ### 2. TypeScript Integration
+
+          **v0.1.0**:
+          ```javascript
+          const client = new GrocyClient(url, apiKey);
+          const result = await client.getStock(); // No type information
+          ```
+
+          **v1.0.0**:
+          ```typescript
+          import { GrocyClient, StockEntry } from 'node-grocy';
+
+          const client = new GrocyClient({ apiUrl: url, apiKey });
+          const result: ReadonlyArray<StockEntry> = await client.stock.getAll();
+          ```
+
+          ### 3. Service-Based Architecture
+
+          **v0.1.0**:
+          ```javascript
+          await client.addToStock(productId, amount);
+          await client.addToShoppingList(productId, amount);
+          ```
+
+          **v1.0.0**:
+          ```typescript
+          await client.stock.add(productId, amount);
+          await client.shoppingList.addItem(productId, amount);
+          ```
+
+          ### 4. Error Handling
+
+          **v0.1.0**:
+          ```javascript
+          try {
+            const result = await client.getProducts();
+          } catch (error) {
+            // Generic error handling
+          }
+          ```
+
+          **v1.0.0**:
+          ```typescript
+          import { GrocyAuthenticationError, GrocyValidationError } from 'node-grocy';
+
+          try {
+            const result = await client.products.getAll();
+          } catch (error) {
+            if (error instanceof GrocyAuthenticationError) {
+              // Handle auth errors
+            } else if (error instanceof GrocyValidationError) {
+              // Handle validation errors
+            }
+          }
+          ```
+
+          ## Migration Steps
+
+          ### Step 1: Update Dependencies
+
+          ```bash
+          npm uninstall node-grocy@0.1.0
+          npm install node-grocy@1.0.0
+          ```
+
+          ### Step 2: Add TypeScript Support (Optional)
+
+          ```bash
+          npm install --save-dev typescript @types/node
+          npx tsc --init
+          ```
+
+          ### Step 3: Update Import Statements
+
+          **Before**:
+          ```javascript
+          const GrocyClient = require('node-grocy');
+          ```
+
+          **After**:
+          ```typescript
+          import { GrocyClient } from 'node-grocy';
+          // or
+          const { GrocyClient } = require('node-grocy');
+          ```
+
+          ### Step 4: Update Client Initialization
+
+          **Before**:
+          ```javascript
+          const client = new GrocyClient('https://grocy.example.com', 'your-api-key');
+          ```
+
+          **After**:
+          ```typescript
+          const client = new GrocyClient({
+            apiUrl: 'https://grocy.example.com',
+            apiKey: 'your-api-key'
+          });
+          ```
+
+          ### Step 5: Update Method Calls
+
+          Use the service-based approach and ensure immutability:
+
+          **Before**:
+          ```javascript
+          const stock = await client.getStock();
+          stock.forEach(item => item.processed = true); // Mutation!
+          ```
+
+          **After**:
+          ```typescript
+          const stock = await client.stock.getAll();
+          const processedStock = stock.map(item => ({ ...item, processed: true }));
+          ```
+
+          ## Compatibility Layer
+
+          For gradual migration, v1.0.0 provides a compatibility layer:
+
+          ```typescript
+          import { LegacyGrocyClient } from 'node-grocy/compat';
+
+          // Works with v0.1.0 API but with v1.0.0 benefits
+          const client = new LegacyGrocyClient(url, apiKey);
+          ```
+
+          ## Testing Your Migration
+
+          1. **Type Checking**: Ensure TypeScript compilation succeeds
+          2. **Immutability**: Run ESLint with functional rules
+          3. **Functionality**: Test all API calls work as expected
+          4. **Performance**: Compare performance with v0.1.0
+
+          ## Getting Help
+
+          - [GitHub Issues](https://github.com/democratize-technology/node-grocy/issues)
+          - [Documentation](./README.md)
+          - [Contributing Guide](../.github/CONTRIBUTING.md)
+
+          ---
+
+          **Last Updated**: $(date)
+          **Status**: Work in progress
+          EOF
+
+      - name: Generate Documentation Statistics
+        run: |
+          echo "📊 Generating documentation statistics..."
+
+          cat > docs-stats.mjs << 'EOF'
+          import fs from 'fs';
+          import path from 'path';
+
+          function analyzeDocumentation() {
+            const stats = {
+              timestamp: new Date().toISOString(),
+              files: {
+                markdown: 0,
+                html: 0,
+                json: 0
+              },
+              content: {
+                totalLines: 0,
+                totalWords: 0,
+                avgWordsPerFile: 0
+              },
+              coverage: {
+                apiMethods: 0,
+                documentedMethods: 0,
+                coveragePercentage: 0
+              }
+            };
+            
+            // Count documentation files
+            function countFiles(dir, stats) {
+              if (!fs.existsSync(dir)) return;
+              
+              const items = fs.readdirSync(dir, { withFileTypes: true });
+              
+              for (const item of items) {
+                const fullPath = path.join(dir, item.name);
                 
-                if (ext === '.md') {
-                  stats.files.markdown++;
+                if (item.isDirectory()) {
+                  countFiles(fullPath, stats);
+                } else {
+                  const ext = path.extname(item.name).toLowerCase();
                   
-                  // Count lines and words
-                  const content = fs.readFileSync(fullPath, 'utf8');
-                  const lines = content.split('\n').length;
-                  const words = content.split(/\s+/).filter(w => w.length > 0).length;
-                  
-                  stats.content.totalLines += lines;
-                  stats.content.totalWords += words;
-                } else if (ext === '.html') {
-                  stats.files.html++;
-                } else if (ext === '.json') {
-                  stats.files.json++;
+                  if (ext === '.md') {
+                    stats.files.markdown++;
+                    
+                    // Count lines and words
+                    const content = fs.readFileSync(fullPath, 'utf8');
+                    const lines = content.split('\n').length;
+                    const words = content.split(/\s+/).filter(w => w.length > 0).length;
+                    
+                    stats.content.totalLines += lines;
+                    stats.content.totalWords += words;
+                  } else if (ext === '.html') {
+                    stats.files.html++;
+                  } else if (ext === '.json') {
+                    stats.files.json++;
+                  }
                 }
               }
             }
-          }
-          
-          countFiles('docs', stats);
-          
-          // Calculate average words per file
-          if (stats.files.markdown > 0) {
-            stats.content.avgWordsPerFile = Math.round(stats.content.totalWords / stats.files.markdown);
-          }
-          
-          // Estimate API coverage (simplified)
-          try {
-            const apiDocs = JSON.parse(fs.readFileSync('api-docs.json', 'utf8'));
-            stats.coverage.apiMethods = apiDocs.methods.length + apiDocs.classes.length;
-            stats.coverage.documentedMethods = apiDocs.methods.filter(m => m.description && m.description.length > 10).length;
             
-            if (stats.coverage.apiMethods > 0) {
-              stats.coverage.coveragePercentage = Math.round(
-                (stats.coverage.documentedMethods / stats.coverage.apiMethods) * 100
-              );
+            countFiles('docs', stats);
+            
+            // Calculate average words per file
+            if (stats.files.markdown > 0) {
+              stats.content.avgWordsPerFile = Math.round(stats.content.totalWords / stats.files.markdown);
             }
-          } catch (e) {
-            console.log('Could not analyze API documentation coverage');
+            
+            // Estimate API coverage (simplified)
+            try {
+              const apiDocs = JSON.parse(fs.readFileSync('api-docs.json', 'utf8'));
+              stats.coverage.apiMethods = apiDocs.methods.length + apiDocs.classes.length;
+              stats.coverage.documentedMethods = apiDocs.methods.filter(m => m.description && m.description.length > 10).length;
+              
+              if (stats.coverage.apiMethods > 0) {
+                stats.coverage.coveragePercentage = Math.round(
+                  (stats.coverage.documentedMethods / stats.coverage.apiMethods) * 100
+                );
+              }
+            } catch (e) {
+              console.log('Could not analyze API documentation coverage');
+            }
+            
+            return stats;
           }
-          
-          return stats;
-        }
-        
-        const stats = analyzeDocumentation();
-        
-        console.log('Documentation Statistics:');
-        console.log(`- Markdown files: ${stats.files.markdown}`);
-        console.log(`- HTML files: ${stats.files.html}`);
-        console.log(`- Total lines: ${stats.content.totalLines}`);
-        console.log(`- Total words: ${stats.content.totalWords}`);
-        console.log(`- API coverage: ${stats.coverage.coveragePercentage}%`);
-        
-        fs.writeFileSync('docs-statistics.json', JSON.stringify(stats, null, 2));
-        EOF
-        
-        node docs-stats.mjs
 
-    - name: Setup GitHub Pages
-      if: github.ref == 'refs/heads/main'
-      uses: actions/configure-pages@v4
+          const stats = analyzeDocumentation();
 
-    - name: Upload to GitHub Pages
-      if: github.ref == 'refs/heads/main'
-      uses: actions/upload-pages-artifact@v3
-      with:
-        path: ./docs
+          console.log('Documentation Statistics:');
+          console.log(`- Markdown files: ${stats.files.markdown}`);
+          console.log(`- HTML files: ${stats.files.html}`);
+          console.log(`- Total lines: ${stats.content.totalLines}`);
+          console.log(`- Total words: ${stats.content.totalWords}`);
+          console.log(`- API coverage: ${stats.coverage.coveragePercentage}%`);
 
-    - name: Deploy to GitHub Pages
-      if: github.ref == 'refs/heads/main'
-      id: deployment
-      uses: actions/deploy-pages@v4
+          fs.writeFileSync('docs-statistics.json', JSON.stringify(stats, null, 2));
+          EOF
 
-    - name: Upload Documentation Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: documentation
-        path: |
-          docs/
-          api-docs.json
-          docs-statistics.json
-        retention-days: 30
+          node docs-stats.mjs
 
-    - name: Comment on PR
-      if: github.event_name == 'pull_request'
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const fs = require('fs');
-          
-          let comment = `## 📚 Documentation Generation Report\n\n`;
-          
-          let stats = {};
-          try {
-            stats = JSON.parse(fs.readFileSync('docs-statistics.json', 'utf8'));
-          } catch (e) {}
-          
-          comment += `| Metric | Value |\n`;
-          comment += `|--------|-------|\n`;
-          comment += `| Markdown Files | ${stats.files?.markdown || 0} |\n`;
-          comment += `| HTML Files | ${stats.files?.html || 0} |\n`;
-          comment += `| Total Lines | ${stats.content?.totalLines || 0} |\n`;
-          comment += `| Total Words | ${stats.content?.totalWords || 0} |\n`;
-          comment += `| API Coverage | ${stats.coverage?.coveragePercentage || 0}% |\n\n`;
-          
-          comment += `### 📖 Generated Documentation\n`;
-          comment += `- [API Reference](./docs/api-reference.md)\n`;
-          comment += `- [Migration Guide](./docs/migration-guide.md)\n`;
-          comment += `- [Documentation Index](./docs/README.md)\n\n`;
-          
-          if (process.env.GITHUB_REF === 'refs/heads/main' || process.env.GITHUB_REF === 'refs/heads/feature/v1-refactoring') {
-            comment += `🌐 **Documentation Website**: [View Live Docs](https://democratize-technology.github.io/node-grocy/)\n\n`;
-          }
-          
-          comment += `📊 [View detailed documentation statistics](${context.payload.pull_request.html_url}/checks)\n\n`;
-          comment += `---\n`;
-          comment += `*This comment was automatically generated by the Documentation Generation workflow*`;
-          
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: comment
-          });
+      - name: Setup GitHub Pages
+        if: github.ref == 'refs/heads/main'
+        uses: actions/configure-pages@v4
 
-    - name: Cache Documentation
-      uses: actions/cache@v4
-      with:
-        path: |
-          docs/
-          node_modules/.cache/typedoc
-        key: docs-${{ runner.os }}-${{ github.sha }}
-        restore-keys: |
-          docs-${{ runner.os }}-
+      - name: Upload to GitHub Pages
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./docs
+
+      - name: Deploy to GitHub Pages
+        if: github.ref == 'refs/heads/main'
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Upload Documentation Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation
+          path: |
+            docs/
+            api-docs.json
+            docs-statistics.json
+          retention-days: 30
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            let comment = `## 📚 Documentation Generation Report\n\n`;
+
+            let stats = {};
+            try {
+              stats = JSON.parse(fs.readFileSync('docs-statistics.json', 'utf8'));
+            } catch (e) {}
+
+            comment += `| Metric | Value |\n`;
+            comment += `|--------|-------|\n`;
+            comment += `| Markdown Files | ${stats.files?.markdown || 0} |\n`;
+            comment += `| HTML Files | ${stats.files?.html || 0} |\n`;
+            comment += `| Total Lines | ${stats.content?.totalLines || 0} |\n`;
+            comment += `| Total Words | ${stats.content?.totalWords || 0} |\n`;
+            comment += `| API Coverage | ${stats.coverage?.coveragePercentage || 0}% |\n\n`;
+
+            comment += `### 📖 Generated Documentation\n`;
+            comment += `- [API Reference](./docs/api-reference.md)\n`;
+            comment += `- [Migration Guide](./docs/migration-guide.md)\n`;
+            comment += `- [Documentation Index](./docs/README.md)\n\n`;
+
+            if (process.env.GITHUB_REF === 'refs/heads/main' || process.env.GITHUB_REF === 'refs/heads/feature/v1-refactoring') {
+              comment += `🌐 **Documentation Website**: [View Live Docs](https://democratize-technology.github.io/node-grocy/)\n\n`;
+            }
+
+            comment += `📊 [View detailed documentation statistics](${context.payload.pull_request.html_url}/checks)\n\n`;
+            comment += `---\n`;
+            comment += `*This comment was automatically generated by the Documentation Generation workflow*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Cache Documentation
+        uses: actions/cache@v4
+        with:
+          path: |
+            docs/
+            node_modules/.cache/typedoc
+          key: docs-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            docs-${{ runner.os }}-

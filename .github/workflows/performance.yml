@@ -2,7 +2,7 @@ name: Performance Benchmarks
 
 on:
   pull_request:
-    branches: [ feature/v1-refactoring ]
+    branches: [feature/v1-refactoring]
     paths:
       - 'src/**/*.ts'
       - 'src/**/*.js'
@@ -16,211 +16,247 @@ permissions:
 jobs:
   performance:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Use Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20.x'
-        cache: 'npm'
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
 
-    - name: Install dependencies
-      run: |
-        npm ci
-        # Install performance testing tools
-        npm list autocannon || npm install --no-save autocannon@latest
-        npm list clinic || npm install --no-save clinic@latest
+      - name: Install dependencies
+        run: |
+          npm ci
+          # Install performance testing tools
+          npm list autocannon || npm install --no-save autocannon@latest
+          npm list clinic || npm install --no-save clinic@latest
 
-    - name: Setup Performance Test Environment
-      timeout-minutes: 10
-      run: |
-        set -euo pipefail
-        echo "⚡ Setting up performance benchmark environment..."
-        
-        # Create mock Grocy server for testing
-        cat > mock-grocy-server.mjs << 'EOF'
-        import http from 'http';
-        import url from 'url';
-        
-        const mockResponses = {
-          '/api/stock': { data: Array.from({length: 100}, (_, i) => ({
-            id: i + 1,
-            product_id: i + 1,
-            amount: Math.floor(Math.random() * 50),
-            best_before_date: '2024-12-31'
-          }))},
-          '/api/shopping-list': { data: Array.from({length: 20}, (_, i) => ({
-            id: i + 1,
-            product_id: i + 1,
-            note: `Shopping item ${i + 1}`,
-            amount: Math.floor(Math.random() * 5) + 1
-          }))},
-          '/api/products': { data: Array.from({length: 200}, (_, i) => ({
-            id: i + 1,
-            name: `Product ${i + 1}`,
-            location_id: Math.floor(Math.random() * 10) + 1,
-            product_group_id: Math.floor(Math.random() * 5) + 1
-          }))}
-        };
-        
-        const server = http.createServer((req, res) => {
-          const parsedUrl = url.parse(req.url, true);
-          const pathname = parsedUrl.pathname;
-          
-          // Add CORS headers
-          res.setHeader('Access-Control-Allow-Origin', '*');
-          res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
-          res.setHeader('Access-Control-Allow-Headers', 'Content-Type, GROCY-API-KEY');
-          
-          if (req.method === 'OPTIONS') {
-            res.writeHead(200);
-            res.end();
-            return;
-          }
-          
-          // Simulate API delay
-          setTimeout(() => {
-            const response = mockResponses[pathname];
-            if (response) {
-              res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify(response));
-            } else {
-              res.writeHead(404, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ error: 'Not found' }));
-            }
-          }, Math.random() * 50); // 0-50ms delay
-        });
-        
-        const port = process.env.PORT || 3000;
-        server.listen(port, () => {
-          console.log(`Mock Grocy server running on port ${port}`);
-        });
-        
-        // Graceful shutdown
-        process.on('SIGTERM', () => server.close());
-        process.on('SIGINT', () => server.close());
-        EOF
+      - name: Setup Performance Test Environment
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          echo "⚡ Setting up performance benchmark environment..."
 
-    - name: Start Mock Server
-      run: |
-        node mock-grocy-server.mjs &
-        MOCK_SERVER_PID=$!
-        echo "MOCK_SERVER_PID=$MOCK_SERVER_PID" >> $GITHUB_ENV
-        
-        # Wait for server to start
-        sleep 2
-        
-        # Verify server is running
-        curl -f http://localhost:3000/api/products > /dev/null || {
-          echo "❌ Mock server failed to start"
-          exit 1
-        }
-        
-        echo "✅ Mock Grocy server started successfully"
+          # Create mock Grocy server for testing
+          cat > mock-grocy-server.mjs << 'EOF'
+          import http from 'http';
+          import url from 'url';
 
-    - name: Run Baseline Performance Tests
-      timeout-minutes: 15
-      run: |
-        set -euo pipefail
-        echo "📊 Running baseline performance benchmarks..."
-        
-        # Create performance test script
-        cat > performance-test.mjs << 'EOF'
-        import { performance } from 'perf_hooks';
-        
-        // Import the node-grocy client using ES module syntax
-        let GrocyClient;
-        try {
-          const distModule = await import('./dist/index.js');
-          GrocyClient = distModule.default;
-        } catch (distError) {
-          try {
-            const srcModule = await import('./index.mjs');
-            GrocyClient = srcModule.default;
-          } catch (srcError) {
-            console.error('Failed to import GrocyClient:', srcError);
-            throw new Error('Cannot run performance tests without GrocyClient');
-          }
-        }
-
-        if (!GrocyClient) {
-          throw new Error('GrocyClient is undefined after import');
-        }
-        
-        async function runPerformanceTests() {
-          const results = {
-            timestamp: new Date().toISOString(),
-            tests: [],
-            summary: {
-              avgLatency: 0,
-              maxLatency: 0,
-              minLatency: Infinity,
-              totalRequests: 0,
-              errorsCount: 0
-            }
+          const mockResponses = {
+            '/api/stock': { data: Array.from({length: 100}, (_, i) => ({
+              id: i + 1,
+              product_id: i + 1,
+              amount: Math.floor(Math.random() * 50),
+              best_before_date: '2024-12-31'
+            }))},
+            '/api/shopping-list': { data: Array.from({length: 20}, (_, i) => ({
+              id: i + 1,
+              product_id: i + 1,
+              note: `Shopping item ${i + 1}`,
+              amount: Math.floor(Math.random() * 5) + 1
+            }))},
+            '/api/products': { data: Array.from({length: 200}, (_, i) => ({
+              id: i + 1,
+              name: `Product ${i + 1}`,
+              location_id: Math.floor(Math.random() * 10) + 1,
+              product_group_id: Math.floor(Math.random() * 5) + 1
+            }))}
           };
-          
-          // Test configuration
-          const testConfig = {
-            baseUrl: 'http://localhost:3000',
-            apiKey: 'test-key',
-            iterations: 10
-          };
-          
-          console.log('Starting performance tests...');
-          
-          // Basic latency test
-          await testBasicLatency(results, testConfig);
-          
-          // Concurrent requests test
-          await testConcurrentRequests(results, testConfig);
-          
-          // Memory usage test
-          await testMemoryUsage(results, testConfig);
-          
-          // Calculate summary
-          if (results.tests.length > 0) {
-            const latencies = results.tests
-              .filter(t => t.type === 'latency')
-              .map(t => t.duration);
+
+          const server = http.createServer((req, res) => {
+            const parsedUrl = url.parse(req.url, true);
+            const pathname = parsedUrl.pathname;
             
-            results.summary.avgLatency = latencies.reduce((a, b) => a + b, 0) / latencies.length;
-            results.summary.maxLatency = Math.max(...latencies);
-            results.summary.minLatency = Math.min(...latencies);
-            results.summary.totalRequests = results.tests.length;
+            // Add CORS headers
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, GROCY-API-KEY');
+            
+            if (req.method === 'OPTIONS') {
+              res.writeHead(200);
+              res.end();
+              return;
+            }
+            
+            // Simulate API delay
+            setTimeout(() => {
+              const response = mockResponses[pathname];
+              if (response) {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(response));
+              } else {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Not found' }));
+              }
+            }, Math.random() * 50); // 0-50ms delay
+          });
+
+          const port = process.env.PORT || 3000;
+          server.listen(port, () => {
+            console.log(`Mock Grocy server running on port ${port}`);
+          });
+
+          // Graceful shutdown
+          process.on('SIGTERM', () => server.close());
+          process.on('SIGINT', () => server.close());
+          EOF
+
+      - name: Start Mock Server
+        run: |
+          node mock-grocy-server.mjs &
+          MOCK_SERVER_PID=$!
+          echo "MOCK_SERVER_PID=$MOCK_SERVER_PID" >> $GITHUB_ENV
+
+          # Wait for server to start
+          sleep 2
+
+          # Verify server is running
+          curl -f http://localhost:3000/api/products > /dev/null || {
+            echo "❌ Mock server failed to start"
+            exit 1
           }
-          
-          return results;
-        }
-        
-        async function testBasicLatency(results, config) {
-          console.log('Testing basic API latency...');
-          
-          for (let i = 0; i < config.iterations; i++) {
+
+          echo "✅ Mock Grocy server started successfully"
+
+      - name: Run Baseline Performance Tests
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          echo "📊 Running baseline performance benchmarks..."
+
+          # Create performance test script
+          cat > performance-test.mjs << 'EOF'
+          import { performance } from 'perf_hooks';
+
+          // Import the node-grocy client using ES module syntax
+          let GrocyClient;
+          try {
+            const distModule = await import('./dist/index.js');
+            GrocyClient = distModule.default;
+          } catch (distError) {
+            try {
+              const srcModule = await import('./index.mjs');
+              GrocyClient = srcModule.default;
+            } catch (srcError) {
+              console.error('Failed to import GrocyClient:', srcError);
+              throw new Error('Cannot run performance tests without GrocyClient');
+            }
+          }
+
+          if (!GrocyClient) {
+            throw new Error('GrocyClient is undefined after import');
+          }
+
+          async function runPerformanceTests() {
+            const results = {
+              timestamp: new Date().toISOString(),
+              tests: [],
+              summary: {
+                avgLatency: 0,
+                maxLatency: 0,
+                minLatency: Infinity,
+                totalRequests: 0,
+                errorsCount: 0
+              }
+            };
+            
+            // Test configuration
+            const testConfig = {
+              baseUrl: 'http://localhost:3000',
+              apiKey: 'test-key',
+              iterations: 10
+            };
+            
+            console.log('Starting performance tests...');
+            
+            // Basic latency test
+            await testBasicLatency(results, testConfig);
+            
+            // Concurrent requests test
+            await testConcurrentRequests(results, testConfig);
+            
+            // Memory usage test
+            await testMemoryUsage(results, testConfig);
+            
+            // Calculate summary
+            if (results.tests.length > 0) {
+              const latencies = results.tests
+                .filter(t => t.type === 'latency')
+                .map(t => t.duration);
+              
+              results.summary.avgLatency = latencies.reduce((a, b) => a + b, 0) / latencies.length;
+              results.summary.maxLatency = Math.max(...latencies);
+              results.summary.minLatency = Math.min(...latencies);
+              results.summary.totalRequests = results.tests.length;
+            }
+            
+            return results;
+          }
+
+          async function testBasicLatency(results, config) {
+            console.log('Testing basic API latency...');
+            
+            for (let i = 0; i < config.iterations; i++) {
+              const start = performance.now();
+              
+              try {
+                // Simple HTTP request test
+                const response = await fetch(`${config.baseUrl}/api/products`);
+                await response.json();
+                
+                const duration = performance.now() - start;
+                results.tests.push({
+                  type: 'latency',
+                  name: 'basic_request',
+                  iteration: i + 1,
+                  duration,
+                  success: true
+                });
+              } catch (error) {
+                results.tests.push({
+                  type: 'latency',
+                  name: 'basic_request',
+                  iteration: i + 1,
+                  duration: performance.now() - start,
+                  success: false,
+                  error: error.message
+                });
+                results.summary.errorsCount++;
+              }
+            }
+          }
+
+          async function testConcurrentRequests(results, config) {
+            console.log('Testing concurrent request handling...');
+            
+            const concurrency = 5;
             const start = performance.now();
             
             try {
-              // Simple HTTP request test
-              const response = await fetch(`${config.baseUrl}/api/products`);
-              await response.json();
+              const promises = Array.from({ length: concurrency }, async (_, i) => {
+                const response = await fetch(`${config.baseUrl}/api/stock`);
+                return response.json();
+              });
+              
+              await Promise.all(promises);
               
               const duration = performance.now() - start;
               results.tests.push({
-                type: 'latency',
-                name: 'basic_request',
-                iteration: i + 1,
+                type: 'concurrency',
+                name: 'concurrent_requests',
+                concurrency,
                 duration,
                 success: true
               });
             } catch (error) {
               results.tests.push({
-                type: 'latency',
-                name: 'basic_request',
-                iteration: i + 1,
+                type: 'concurrency',
+                name: 'concurrent_requests',
+                concurrency,
                 duration: performance.now() - start,
                 success: false,
                 error: error.message
@@ -228,349 +264,313 @@ jobs:
               results.summary.errorsCount++;
             }
           }
-        }
-        
-        async function testConcurrentRequests(results, config) {
-          console.log('Testing concurrent request handling...');
-          
-          const concurrency = 5;
-          const start = performance.now();
-          
-          try {
-            const promises = Array.from({ length: concurrency }, async (_, i) => {
-              const response = await fetch(`${config.baseUrl}/api/stock`);
-              return response.json();
-            });
+
+          async function testMemoryUsage(results, config) {
+            console.log('Testing memory usage...');
             
-            await Promise.all(promises);
+            const initialMemory = process.memoryUsage();
+            const start = performance.now();
             
+            // Perform multiple operations to test memory handling
+            for (let i = 0; i < 20; i++) {
+              try {
+                const response = await fetch(`${config.baseUrl}/api/products`);
+                await response.json();
+              } catch (e) {
+                // Continue testing even if some requests fail
+              }
+            }
+            
+            // Force garbage collection if available
+            if (global.gc) {
+              global.gc();
+            }
+            
+            const finalMemory = process.memoryUsage();
             const duration = performance.now() - start;
+            
             results.tests.push({
-              type: 'concurrency',
-              name: 'concurrent_requests',
-              concurrency,
+              type: 'memory',
+              name: 'memory_usage',
               duration,
+              memoryDelta: {
+                heapUsed: finalMemory.heapUsed - initialMemory.heapUsed,
+                heapTotal: finalMemory.heapTotal - initialMemory.heapTotal,
+                external: finalMemory.external - initialMemory.external
+              },
               success: true
             });
-          } catch (error) {
-            results.tests.push({
-              type: 'concurrency',
-              name: 'concurrent_requests',
-              concurrency,
-              duration: performance.now() - start,
-              success: false,
-              error: error.message
-            });
-            results.summary.errorsCount++;
           }
-        }
-        
-        async function testMemoryUsage(results, config) {
-          console.log('Testing memory usage...');
-          
-          const initialMemory = process.memoryUsage();
-          const start = performance.now();
-          
-          // Perform multiple operations to test memory handling
-          for (let i = 0; i < 20; i++) {
+
+          // Run tests and save results
+          runPerformanceTests()
+            .then(async results => {
+              console.log('Performance test results:', JSON.stringify(results, null, 2));
+              const fs = await import('fs');
+              fs.writeFileSync('performance-results.json', JSON.stringify(results, null, 2));
+              
+              console.log(`\nSummary:
+              - Average latency: ${results.summary.avgLatency.toFixed(2)}ms
+              - Max latency: ${results.summary.maxLatency.toFixed(2)}ms
+              - Min latency: ${results.summary.minLatency.toFixed(2)}ms
+              - Total requests: ${results.summary.totalRequests}
+              - Errors: ${results.summary.errorsCount}`);
+            })
+            .catch(error => {
+              console.error('Performance test failed:', error);
+              process.exit(1);
+            });
+          EOF
+
+          # Run the performance tests
+          node performance-test.mjs
+
+      - name: Compare with Baseline
+        run: |
+          echo "📈 Comparing performance with baseline..."
+
+          # Create comparison script
+          cat > compare-performance.mjs << 'EOF'
+          import fs from 'fs';
+
+          function comparePerformance() {
+            let currentResults;
             try {
-              const response = await fetch(`${config.baseUrl}/api/products`);
-              await response.json();
+              currentResults = JSON.parse(fs.readFileSync('performance-results.json', 'utf8'));
             } catch (e) {
-              // Continue testing even if some requests fail
+              console.log('No current performance results found');
+              return { hasRegression: false, comparison: null };
             }
-          }
-          
-          // Force garbage collection if available
-          if (global.gc) {
-            global.gc();
-          }
-          
-          const finalMemory = process.memoryUsage();
-          const duration = performance.now() - start;
-          
-          results.tests.push({
-            type: 'memory',
-            name: 'memory_usage',
-            duration,
-            memoryDelta: {
-              heapUsed: finalMemory.heapUsed - initialMemory.heapUsed,
-              heapTotal: finalMemory.heapTotal - initialMemory.heapTotal,
-              external: finalMemory.external - initialMemory.external
-            },
-            success: true
-          });
-        }
-        
-        // Run tests and save results
-        runPerformanceTests()
-          .then(async results => {
-            console.log('Performance test results:', JSON.stringify(results, null, 2));
-            const fs = await import('fs');
-            fs.writeFileSync('performance-results.json', JSON.stringify(results, null, 2));
             
-            console.log(`\nSummary:
-            - Average latency: ${results.summary.avgLatency.toFixed(2)}ms
-            - Max latency: ${results.summary.maxLatency.toFixed(2)}ms
-            - Min latency: ${results.summary.minLatency.toFixed(2)}ms
-            - Total requests: ${results.summary.totalRequests}
-            - Errors: ${results.summary.errorsCount}`);
-          })
-          .catch(error => {
-            console.error('Performance test failed:', error);
-            process.exit(1);
-          });
-        EOF
-        
-        # Run the performance tests
-        node performance-test.mjs
-
-    - name: Compare with Baseline
-      run: |
-        echo "📈 Comparing performance with baseline..."
-        
-        # Create comparison script
-        cat > compare-performance.mjs << 'EOF'
-        import fs from 'fs';
-        
-        function comparePerformance() {
-          let currentResults;
-          try {
-            currentResults = JSON.parse(fs.readFileSync('performance-results.json', 'utf8'));
-          } catch (e) {
-            console.log('No current performance results found');
-            return { hasRegression: false, comparison: null };
-          }
-          
-          // Performance thresholds (in milliseconds)
-          const thresholds = {
-            avgLatency: 500,    // Average request should be under 500ms
-            maxLatency: 2000,   // Max request should be under 2s
-            errorRate: 0.05     // Error rate should be under 5%
-          };
-          
-          const current = currentResults.summary;
-          const errorRate = current.errorsCount / Math.max(current.totalRequests, 1);
-          
-          const violations = [];
-          
-          if (current.avgLatency > thresholds.avgLatency) {
-            violations.push({
-              metric: 'avgLatency',
-              current: current.avgLatency,
-              threshold: thresholds.avgLatency,
-              message: `Average latency ${current.avgLatency.toFixed(2)}ms exceeds threshold ${thresholds.avgLatency}ms`
-            });
-          }
-          
-          if (current.maxLatency > thresholds.maxLatency) {
-            violations.push({
-              metric: 'maxLatency',
-              current: current.maxLatency,
-              threshold: thresholds.maxLatency,
-              message: `Max latency ${current.maxLatency.toFixed(2)}ms exceeds threshold ${thresholds.maxLatency}ms`
-            });
-          }
-          
-          if (errorRate > thresholds.errorRate) {
-            violations.push({
-              metric: 'errorRate',
-              current: errorRate,
-              threshold: thresholds.errorRate,
-              message: `Error rate ${(errorRate * 100).toFixed(2)}% exceeds threshold ${(thresholds.errorRate * 100)}%`
-            });
-          }
-          
-          const result = {
-            hasRegression: violations.length > 0,
-            violations,
-            summary: {
-              avgLatency: current.avgLatency,
-              maxLatency: current.maxLatency,
-              errorRate: errorRate * 100,
-              totalRequests: current.totalRequests
-            },
-            status: violations.length === 0 ? 'PASSED' : 'FAILED'
-          };
-          
-          fs.writeFileSync('performance-comparison.json', JSON.stringify(result, null, 2));
-          return result;
-        }
-        
-        const comparison = comparePerformance();
-        
-        console.log('Performance Comparison Results:');
-        console.log(`Status: ${comparison.status}`);
-        console.log(`Average Latency: ${comparison.summary.avgLatency.toFixed(2)}ms`);
-        console.log(`Max Latency: ${comparison.summary.maxLatency.toFixed(2)}ms`);
-        console.log(`Error Rate: ${comparison.summary.errorRate.toFixed(2)}%`);
-        
-        if (comparison.violations.length > 0) {
-          console.log('\nPerformance Violations:');
-          comparison.violations.forEach(v => console.log(`  - ${v.message}`));
-        }
-        
-        if (comparison.hasRegression) {
-          console.log('\n❌ Performance regression detected!');
-          process.exit(1);
-        } else {
-          console.log('\n✅ Performance within acceptable limits');
-        }
-        EOF
-        
-        node compare-performance.mjs
-
-    - name: Generate Performance Report
-      run: |
-        echo "📋 Generating performance report..."
-        
-        cat > performance-report.md << 'EOF'
-        # Performance Benchmark Report
-        
-        Generated on: $(date)
-        PR: #${{ github.event.pull_request.number }}
-        
-        ## Performance Summary
-        
-        EOF
-        
-        # Add performance data using jq
-        echo "| Metric | Value | Status |" >> performance-report.md
-        echo "|--------|-------|--------|" >> performance-report.md
-        
-        # Average Latency
-        AVG_LATENCY=$(jq -r '.summary.avgLatency // 0' performance-comparison.json 2>/dev/null || echo 0)
-        AVG_STATUS=$([ "$(echo "$AVG_LATENCY < 500" | bc -l)" = "1" ] && echo "✅" || echo "❌")
-        echo "| **Average Latency** | ${AVG_LATENCY}ms | $AVG_STATUS |" >> performance-report.md
-        
-        # Max Latency
-        MAX_LATENCY=$(jq -r '.summary.maxLatency // 0' performance-comparison.json 2>/dev/null || echo 0)
-        MAX_STATUS=$([ "$(echo "$MAX_LATENCY < 2000" | bc -l)" = "1" ] && echo "✅" || echo "❌")
-        echo "| **Max Latency** | ${MAX_LATENCY}ms | $MAX_STATUS |" >> performance-report.md
-        
-        # Error Rate
-        ERROR_RATE=$(jq -r '.summary.errorRate // 0' performance-comparison.json 2>/dev/null || echo 0)
-        ERROR_STATUS=$([ "$(echo "$ERROR_RATE < 5" | bc -l)" = "1" ] && echo "✅" || echo "❌")
-        echo "| **Error Rate** | ${ERROR_RATE}% | $ERROR_STATUS |" >> performance-report.md
-        
-        # Total Requests
-        TOTAL_REQ=$(jq -r '.summary.totalRequests // 0' performance-comparison.json 2>/dev/null || echo 0)
-        echo "| **Total Requests** | $TOTAL_REQ | - |" >> performance-report.md
-        
-        # Overall Status
-        OVERALL_STATUS=$(jq -r '.status // "UNKNOWN"' performance-comparison.json 2>/dev/null || echo "UNKNOWN")
-        OVERALL_ICON=$([ "$OVERALL_STATUS" = "PASSED" ] && echo "✅" || echo "❌")
-        echo "| **Overall Status** | $OVERALL_STATUS | $OVERALL_ICON |" >> performance-report.md
-        
-        echo "" >> performance-report.md
-        echo "## Performance Thresholds" >> performance-report.md
-        echo "" >> performance-report.md
-        echo "- **Average Latency**: < 500ms" >> performance-report.md
-        echo "- **Max Latency**: < 2000ms" >> performance-report.md
-        echo "- **Error Rate**: < 5%" >> performance-report.md
-        echo "" >> performance-report.md
-        
-        # Add violations if any
-        HAS_VIOLATIONS=$(jq -r '.hasRegression // false' performance-comparison.json 2>/dev/null || echo "false")
-        
-        if [ "$HAS_VIOLATIONS" = "true" ]; then
-          echo "## ⚠️ Performance Issues Detected" >> performance-report.md
-          echo "" >> performance-report.md
-          jq -r '.violations[]? | "- " + .message' performance-comparison.json 2>/dev/null >> performance-report.md || true
-          echo "" >> performance-report.md
-        else
-          echo "## ✅ Performance Acceptable" >> performance-report.md
-          echo "" >> performance-report.md
-          echo "All performance metrics are within acceptable thresholds." >> performance-report.md
-          echo "" >> performance-report.md
-        fi
-        
-        echo "## Recommendations" >> performance-report.md
-        echo "" >> performance-report.md
-        echo "- Monitor performance regularly during refactoring" >> performance-report.md
-        echo "- Consider caching for frequently accessed data" >> performance-report.md
-        echo "- Implement connection pooling for HTTP requests" >> performance-report.md
-        echo "- Profile memory usage in production scenarios" >> performance-report.md
-
-    - name: Cleanup
-      if: always()
-      run: |
-        # Stop mock server
-        if [ ! -z "${{ env.MOCK_SERVER_PID }}" ]; then
-          kill ${{ env.MOCK_SERVER_PID }} 2>/dev/null || true
-        fi
-
-    - name: Upload Performance Reports
-      uses: actions/upload-artifact@v4
-      with:
-        name: performance-reports
-        path: |
-          performance-report.md
-          performance-results.json
-          performance-comparison.json
-        retention-days: 30
-
-    - name: Comment on PR
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const fs = require('fs');
-          
-          let comment = `## ⚡ Performance Benchmark Report\n\n`;
-          
-          let comparison = {};
-          try {
-            comparison = JSON.parse(fs.readFileSync('performance-comparison.json', 'utf8'));
-          } catch (e) {}
-          
-          const status = comparison.status || 'UNKNOWN';
-          const emoji = status === 'PASSED' ? '✅' : '❌';
-          
-          comment += `**Status**: ${emoji} ${status}\n\n`;
-          
-          comment += `| Metric | Value | Threshold |\n`;
-          comment += `|--------|-------|----------|\n`;
-          comment += `| Avg Latency | ${(comparison.summary?.avgLatency || 0).toFixed(2)}ms | < 500ms |\n`;
-          comment += `| Max Latency | ${(comparison.summary?.maxLatency || 0).toFixed(2)}ms | < 2000ms |\n`;
-          comment += `| Error Rate | ${(comparison.summary?.errorRate || 0).toFixed(2)}% | < 5% |\n\n`;
-          
-          if (comparison.hasRegression) {
-            comment += `### ⚠️ Performance Issues\n`;
-            if (comparison.violations) {
-              comparison.violations.forEach(v => {
-                comment += `- ${v.message}\n`;
+            // Performance thresholds (in milliseconds)
+            const thresholds = {
+              avgLatency: 500,    // Average request should be under 500ms
+              maxLatency: 2000,   // Max request should be under 2s
+              errorRate: 0.05     // Error rate should be under 5%
+            };
+            
+            const current = currentResults.summary;
+            const errorRate = current.errorsCount / Math.max(current.totalRequests, 1);
+            
+            const violations = [];
+            
+            if (current.avgLatency > thresholds.avgLatency) {
+              violations.push({
+                metric: 'avgLatency',
+                current: current.avgLatency,
+                threshold: thresholds.avgLatency,
+                message: `Average latency ${current.avgLatency.toFixed(2)}ms exceeds threshold ${thresholds.avgLatency}ms`
               });
             }
-            comment += `\n`;
+            
+            if (current.maxLatency > thresholds.maxLatency) {
+              violations.push({
+                metric: 'maxLatency',
+                current: current.maxLatency,
+                threshold: thresholds.maxLatency,
+                message: `Max latency ${current.maxLatency.toFixed(2)}ms exceeds threshold ${thresholds.maxLatency}ms`
+              });
+            }
+            
+            if (errorRate > thresholds.errorRate) {
+              violations.push({
+                metric: 'errorRate',
+                current: errorRate,
+                threshold: thresholds.errorRate,
+                message: `Error rate ${(errorRate * 100).toFixed(2)}% exceeds threshold ${(thresholds.errorRate * 100)}%`
+              });
+            }
+            
+            const result = {
+              hasRegression: violations.length > 0,
+              violations,
+              summary: {
+                avgLatency: current.avgLatency,
+                maxLatency: current.maxLatency,
+                errorRate: errorRate * 100,
+                totalRequests: current.totalRequests
+              },
+              status: violations.length === 0 ? 'PASSED' : 'FAILED'
+            };
+            
+            fs.writeFileSync('performance-comparison.json', JSON.stringify(result, null, 2));
+            return result;
           }
-          
-          comment += `📊 [View detailed performance report](${context.payload.pull_request.html_url}/checks)\n\n`;
-          comment += `---\n`;
-          comment += `*This comment was automatically generated by the Performance Benchmarks workflow*`;
-          
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: comment
-          });
 
-    - name: Cleanup Mock Server
-      if: always()
-      run: |
-        echo "🧹 Cleaning up mock server..."
-        # Kill any processes running on port 3000
-        pkill -f "node mock-grocy-server.js" || echo "No mock server process found"
-        # Alternative cleanup method
-        lsof -ti:3000 | xargs kill -9 2>/dev/null || echo "Port 3000 is free"
-        echo "✅ Cleanup completed"
+          const comparison = comparePerformance();
 
-    - name: Cache Performance Data
-      uses: actions/cache@v4
-      with:
-        path: |
-          performance-results.json
-          performance-comparison.json
-        key: performance-${{ runner.os }}-${{ github.sha }}
-        restore-keys: |
-          performance-${{ runner.os }}-
+          console.log('Performance Comparison Results:');
+          console.log(`Status: ${comparison.status}`);
+          console.log(`Average Latency: ${comparison.summary.avgLatency.toFixed(2)}ms`);
+          console.log(`Max Latency: ${comparison.summary.maxLatency.toFixed(2)}ms`);
+          console.log(`Error Rate: ${comparison.summary.errorRate.toFixed(2)}%`);
+
+          if (comparison.violations.length > 0) {
+            console.log('\nPerformance Violations:');
+            comparison.violations.forEach(v => console.log(`  - ${v.message}`));
+          }
+
+          if (comparison.hasRegression) {
+            console.log('\n❌ Performance regression detected!');
+            process.exit(1);
+          } else {
+            console.log('\n✅ Performance within acceptable limits');
+          }
+          EOF
+
+          node compare-performance.mjs
+
+      - name: Generate Performance Report
+        run: |
+          echo "📋 Generating performance report..."
+
+          cat > performance-report.md << 'EOF'
+          # Performance Benchmark Report
+
+          Generated on: $(date)
+          PR: #${{ github.event.pull_request.number }}
+
+          ## Performance Summary
+
+          EOF
+
+          # Add performance data using jq
+          echo "| Metric | Value | Status |" >> performance-report.md
+          echo "|--------|-------|--------|" >> performance-report.md
+
+          # Average Latency
+          AVG_LATENCY=$(jq -r '.summary.avgLatency // 0' performance-comparison.json 2>/dev/null || echo 0)
+          AVG_STATUS=$([ "$(echo "$AVG_LATENCY < 500" | bc -l)" = "1" ] && echo "✅" || echo "❌")
+          echo "| **Average Latency** | ${AVG_LATENCY}ms | $AVG_STATUS |" >> performance-report.md
+
+          # Max Latency
+          MAX_LATENCY=$(jq -r '.summary.maxLatency // 0' performance-comparison.json 2>/dev/null || echo 0)
+          MAX_STATUS=$([ "$(echo "$MAX_LATENCY < 2000" | bc -l)" = "1" ] && echo "✅" || echo "❌")
+          echo "| **Max Latency** | ${MAX_LATENCY}ms | $MAX_STATUS |" >> performance-report.md
+
+          # Error Rate
+          ERROR_RATE=$(jq -r '.summary.errorRate // 0' performance-comparison.json 2>/dev/null || echo 0)
+          ERROR_STATUS=$([ "$(echo "$ERROR_RATE < 5" | bc -l)" = "1" ] && echo "✅" || echo "❌")
+          echo "| **Error Rate** | ${ERROR_RATE}% | $ERROR_STATUS |" >> performance-report.md
+
+          # Total Requests
+          TOTAL_REQ=$(jq -r '.summary.totalRequests // 0' performance-comparison.json 2>/dev/null || echo 0)
+          echo "| **Total Requests** | $TOTAL_REQ | - |" >> performance-report.md
+
+          # Overall Status
+          OVERALL_STATUS=$(jq -r '.status // "UNKNOWN"' performance-comparison.json 2>/dev/null || echo "UNKNOWN")
+          OVERALL_ICON=$([ "$OVERALL_STATUS" = "PASSED" ] && echo "✅" || echo "❌")
+          echo "| **Overall Status** | $OVERALL_STATUS | $OVERALL_ICON |" >> performance-report.md
+
+          echo "" >> performance-report.md
+          echo "## Performance Thresholds" >> performance-report.md
+          echo "" >> performance-report.md
+          echo "- **Average Latency**: < 500ms" >> performance-report.md
+          echo "- **Max Latency**: < 2000ms" >> performance-report.md
+          echo "- **Error Rate**: < 5%" >> performance-report.md
+          echo "" >> performance-report.md
+
+          # Add violations if any
+          HAS_VIOLATIONS=$(jq -r '.hasRegression // false' performance-comparison.json 2>/dev/null || echo "false")
+
+          if [ "$HAS_VIOLATIONS" = "true" ]; then
+            echo "## ⚠️ Performance Issues Detected" >> performance-report.md
+            echo "" >> performance-report.md
+            jq -r '.violations[]? | "- " + .message' performance-comparison.json 2>/dev/null >> performance-report.md || true
+            echo "" >> performance-report.md
+          else
+            echo "## ✅ Performance Acceptable" >> performance-report.md
+            echo "" >> performance-report.md
+            echo "All performance metrics are within acceptable thresholds." >> performance-report.md
+            echo "" >> performance-report.md
+          fi
+
+          echo "## Recommendations" >> performance-report.md
+          echo "" >> performance-report.md
+          echo "- Monitor performance regularly during refactoring" >> performance-report.md
+          echo "- Consider caching for frequently accessed data" >> performance-report.md
+          echo "- Implement connection pooling for HTTP requests" >> performance-report.md
+          echo "- Profile memory usage in production scenarios" >> performance-report.md
+
+      - name: Cleanup
+        if: always()
+        run: |
+          # Stop mock server
+          if [ ! -z "${{ env.MOCK_SERVER_PID }}" ]; then
+            kill ${{ env.MOCK_SERVER_PID }} 2>/dev/null || true
+          fi
+
+      - name: Upload Performance Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-reports
+          path: |
+            performance-report.md
+            performance-results.json
+            performance-comparison.json
+          retention-days: 30
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            let comment = `## ⚡ Performance Benchmark Report\n\n`;
+
+            let comparison = {};
+            try {
+              comparison = JSON.parse(fs.readFileSync('performance-comparison.json', 'utf8'));
+            } catch (e) {}
+
+            const status = comparison.status || 'UNKNOWN';
+            const emoji = status === 'PASSED' ? '✅' : '❌';
+
+            comment += `**Status**: ${emoji} ${status}\n\n`;
+
+            comment += `| Metric | Value | Threshold |\n`;
+            comment += `|--------|-------|----------|\n`;
+            comment += `| Avg Latency | ${(comparison.summary?.avgLatency || 0).toFixed(2)}ms | < 500ms |\n`;
+            comment += `| Max Latency | ${(comparison.summary?.maxLatency || 0).toFixed(2)}ms | < 2000ms |\n`;
+            comment += `| Error Rate | ${(comparison.summary?.errorRate || 0).toFixed(2)}% | < 5% |\n\n`;
+
+            if (comparison.hasRegression) {
+              comment += `### ⚠️ Performance Issues\n`;
+              if (comparison.violations) {
+                comparison.violations.forEach(v => {
+                  comment += `- ${v.message}\n`;
+                });
+              }
+              comment += `\n`;
+            }
+
+            comment += `📊 [View detailed performance report](${context.payload.pull_request.html_url}/checks)\n\n`;
+            comment += `---\n`;
+            comment += `*This comment was automatically generated by the Performance Benchmarks workflow*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Cleanup Mock Server
+        if: always()
+        run: |
+          echo "🧹 Cleaning up mock server..."
+          # Kill any processes running on port 3000
+          pkill -f "node mock-grocy-server.js" || echo "No mock server process found"
+          # Alternative cleanup method
+          lsof -ti:3000 | xargs kill -9 2>/dev/null || echo "Port 3000 is free"
+          echo "✅ Cleanup completed"
+
+      - name: Cache Performance Data
+        uses: actions/cache@v4
+        with:
+          path: |
+            performance-results.json
+            performance-comparison.json
+          key: performance-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            performance-${{ runner.os }}-

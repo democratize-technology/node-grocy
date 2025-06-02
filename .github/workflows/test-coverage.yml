@@ -2,12 +2,12 @@ name: Test Coverage
 
 on:
   pull_request:
-    branches: [ main, feature/v1-refactoring ]
+    branches: [main, feature/v1-refactoring]
   workflow_run:
-    workflows: ["Node.js CI"]
+    workflows: ['Node.js CI']
     types:
       - completed
-    branches: [ main, feature/v1-refactoring ]
+    branches: [main, feature/v1-refactoring]
 
 permissions:
   contents: read
@@ -19,189 +19,189 @@ jobs:
     if: >
       github.event_name == 'pull_request' ||
       (github.event.workflow_run.conclusion == 'success')
-    
+
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0  # Fetch full history for accurate coverage comparison
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch full history for accurate coverage comparison
 
-    - name: Use Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20.x'
-        cache: 'npm'
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
 
-    - name: Install dependencies
-      run: |
-        npm ci
-        # Install c8 for coverage if not present
-        npm list c8 || npm install --no-save c8@latest
+      - name: Install dependencies
+        run: |
+          npm ci
+          # Install c8 for coverage if not present
+          npm list c8 || npm install --no-save c8@latest
 
-    - name: Run tests with coverage
-      run: |
-        echo "🧪 Running comprehensive test suite with coverage..."
-        
-        # Run tests with c8 coverage
-        npx c8 --reporter=text --reporter=lcov --reporter=json-summary npm test
-        
-        # Store coverage percentage in environment from the json-summary
-        if [ -f "coverage/coverage-summary.json" ]; then
-          COVERAGE=$(jq '.total.lines.pct' coverage/coverage-summary.json)
-          echo "COVERAGE_PERCENTAGE=$COVERAGE" >> $GITHUB_ENV
-          echo "Current coverage: $COVERAGE%"
-        else
-          echo "COVERAGE_PERCENTAGE=0" >> $GITHUB_ENV
-          echo "Warning: No coverage data generated"
-        fi
+      - name: Run tests with coverage
+        run: |
+          echo "🧪 Running comprehensive test suite with coverage..."
 
-    - name: Check Coverage Threshold
-      run: |
-        echo "🎯 Checking coverage against 95% threshold..."
-        
-        THRESHOLD=95
-        CURRENT=${{ env.COVERAGE_PERCENTAGE }}
-        
-        if (( $(echo "$CURRENT < $THRESHOLD" | bc -l) )); then
-          echo "❌ COVERAGE FAILURE: $CURRENT% < $THRESHOLD%"
-          echo ""
-          echo "Test coverage is below the required 95% threshold."
-          echo "Current coverage: $CURRENT%"
-          echo "Required minimum: $THRESHOLD%"
-          echo ""
-          echo "To fix this:"
-          echo "1. Add tests for uncovered code paths"
-          echo "2. Focus on edge cases and error handling"
-          echo "3. Ensure all public API methods are tested"
-          echo "4. Check coverage report for specific gaps"
-          echo ""
-          exit 1
-        fi
-        
-        echo "✅ Coverage check passed: $CURRENT% >= $THRESHOLD%"
+          # Run tests with c8 coverage
+          npx c8 --reporter=text --reporter=lcov --reporter=json-summary npm test
 
-    - name: Generate Coverage Report
-      run: |
-        echo "📊 Generating detailed coverage report..."
-        
-        # Create detailed HTML report (only if coverage data exists)
-        if [ -d "coverage" ] && [ "$(ls -A coverage 2>/dev/null)" ]; then
-          npx c8 report --reporter=html --reports-dir=coverage/html || echo "HTML report generation skipped"
-        else
-          echo "No coverage data available for HTML report"
-          mkdir -p coverage/html
-          echo "<html><body><h1>No Coverage Data</h1><p>Coverage data not available</p></body></html>" > coverage/html/index.html
-        fi
-        
-        # Create markdown summary
-        cat > coverage-summary.md << 'EOF'
-        # Test Coverage Report
-        
-        ## Summary
-        - **Coverage**: ${{ env.COVERAGE_PERCENTAGE }}%
-        - **Threshold**: 95%
-        - **Status**: ${{ env.COVERAGE_PERCENTAGE >= 95 && '✅ PASSED' || '❌ FAILED' }}
-        
-        ## Coverage Breakdown
-        EOF
-        
-        # Add detailed coverage breakdown
-        npx c8 report --reporter=text >> coverage-summary.md
-        
-        echo "Coverage report generated!"
-
-    - name: Compare Coverage with Base Branch
-      if: github.event_name == 'pull_request'
-      run: |
-        echo "📈 Comparing coverage with base branch..."
-        
-        # Fetch base branch coverage if available
-        BASE_COVERAGE_FILE="coverage/coverage-summary.json"
-        
-        if [ -f "$BASE_COVERAGE_FILE" ]; then
-          BASE_COVERAGE=$(jq '.total.lines.pct' "$BASE_COVERAGE_FILE")
-          CURRENT_COVERAGE=${{ env.COVERAGE_PERCENTAGE }}
-          
-          # Calculate difference
-          DIFF=$(echo "scale=2; $CURRENT_COVERAGE - $BASE_COVERAGE" | bc)
-          
-          echo "Base coverage: $BASE_COVERAGE%"
-          echo "Current coverage: $CURRENT_COVERAGE%"
-          echo "Difference: $DIFF%"
-          
-          # Create comparison report
-          cat > coverage-comparison.md << EOF
-        ## Coverage Comparison
-        
-        | Branch | Coverage | Change |
-        |--------|----------|--------|
-        | Base | $BASE_COVERAGE% | - |
-        | Current | $CURRENT_COVERAGE% | $DIFF% |
-        EOF
-          
-          if (( $(echo "$DIFF < 0" | bc -l) )); then
-            echo "⚠️  Coverage decreased by $DIFF%"
-            echo "COVERAGE_DECREASED=true" >> $GITHUB_ENV
+          # Store coverage percentage in environment from the json-summary
+          if [ -f "coverage/coverage-summary.json" ]; then
+            COVERAGE=$(jq '.total.lines.pct' coverage/coverage-summary.json)
+            echo "COVERAGE_PERCENTAGE=$COVERAGE" >> $GITHUB_ENV
+            echo "Current coverage: $COVERAGE%"
           else
-            echo "✅ Coverage maintained or improved by $DIFF%"
+            echo "COVERAGE_PERCENTAGE=0" >> $GITHUB_ENV
+            echo "Warning: No coverage data generated"
           fi
-        else
-          echo "No base coverage found for comparison"
-        fi
 
-    - name: Fail on Coverage Decrease
-      if: env.COVERAGE_DECREASED == 'true'
-      run: |
-        echo "❌ COVERAGE REGRESSION DETECTED"
-        echo ""
-        echo "Test coverage has decreased compared to the base branch."
-        echo "This is not allowed for node-grocy v1.0.0 refactoring."
-        echo ""
-        echo "Please add tests to maintain or improve coverage."
-        exit 1
+      - name: Check Coverage Threshold
+        run: |
+          echo "🎯 Checking coverage against 95% threshold..."
 
-    - name: Upload Coverage Report
-      uses: actions/upload-artifact@v4
-      with:
-        name: coverage-report
-        path: |
-          coverage/
-          coverage-summary.md
-          coverage-comparison.md
-        retention-days: 30
+          THRESHOLD=95
+          CURRENT=${{ env.COVERAGE_PERCENTAGE }}
 
-    - name: Comment on PR
-      if: github.event_name == 'pull_request'
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const fs = require('fs');
-          
-          let comment = `## 📊 Test Coverage Report\n\n`;
-          comment += `**Coverage**: ${{ env.COVERAGE_PERCENTAGE }}%\n`;
-          comment += `**Threshold**: 95%\n`;
-          comment += `**Status**: ${{ env.COVERAGE_PERCENTAGE >= 95 && '✅ PASSED' || '❌ FAILED' }}\n\n`;
-          
-          // Add comparison if available
-          if (fs.existsSync('coverage-comparison.md')) {
-            const comparison = fs.readFileSync('coverage-comparison.md', 'utf8');
-            comment += comparison + '\n\n';
-          }
-          
-          comment += `📈 [View detailed coverage report](${context.payload.pull_request.html_url}/checks)\n\n`;
-          comment += `---\n`;
-          comment += `*This comment was automatically generated by the Test Coverage workflow*`;
-          
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: comment
-          });
+          if (( $(echo "$CURRENT < $THRESHOLD" | bc -l) )); then
+            echo "❌ COVERAGE FAILURE: $CURRENT% < $THRESHOLD%"
+            echo ""
+            echo "Test coverage is below the required 95% threshold."
+            echo "Current coverage: $CURRENT%"
+            echo "Required minimum: $THRESHOLD%"
+            echo ""
+            echo "To fix this:"
+            echo "1. Add tests for uncovered code paths"
+            echo "2. Focus on edge cases and error handling"
+            echo "3. Ensure all public API methods are tested"
+            echo "4. Check coverage report for specific gaps"
+            echo ""
+            exit 1
+          fi
 
-    - name: Cache Coverage Results
-      uses: actions/cache@v4
-      with:
-        path: coverage/
-        key: coverage-${{ runner.os }}-${{ github.sha }}
-        restore-keys: |
-          coverage-${{ runner.os }}-
+          echo "✅ Coverage check passed: $CURRENT% >= $THRESHOLD%"
+
+      - name: Generate Coverage Report
+        run: |
+          echo "📊 Generating detailed coverage report..."
+
+          # Create detailed HTML report (only if coverage data exists)
+          if [ -d "coverage" ] && [ "$(ls -A coverage 2>/dev/null)" ]; then
+            npx c8 report --reporter=html --reports-dir=coverage/html || echo "HTML report generation skipped"
+          else
+            echo "No coverage data available for HTML report"
+            mkdir -p coverage/html
+            echo "<html><body><h1>No Coverage Data</h1><p>Coverage data not available</p></body></html>" > coverage/html/index.html
+          fi
+
+          # Create markdown summary
+          cat > coverage-summary.md << 'EOF'
+          # Test Coverage Report
+
+          ## Summary
+          - **Coverage**: ${{ env.COVERAGE_PERCENTAGE }}%
+          - **Threshold**: 95%
+          - **Status**: ${{ env.COVERAGE_PERCENTAGE >= 95 && '✅ PASSED' || '❌ FAILED' }}
+
+          ## Coverage Breakdown
+          EOF
+
+          # Add detailed coverage breakdown
+          npx c8 report --reporter=text >> coverage-summary.md
+
+          echo "Coverage report generated!"
+
+      - name: Compare Coverage with Base Branch
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "📈 Comparing coverage with base branch..."
+
+          # Fetch base branch coverage if available
+          BASE_COVERAGE_FILE="coverage/coverage-summary.json"
+
+          if [ -f "$BASE_COVERAGE_FILE" ]; then
+            BASE_COVERAGE=$(jq '.total.lines.pct' "$BASE_COVERAGE_FILE")
+            CURRENT_COVERAGE=${{ env.COVERAGE_PERCENTAGE }}
+            
+            # Calculate difference
+            DIFF=$(echo "scale=2; $CURRENT_COVERAGE - $BASE_COVERAGE" | bc)
+            
+            echo "Base coverage: $BASE_COVERAGE%"
+            echo "Current coverage: $CURRENT_COVERAGE%"
+            echo "Difference: $DIFF%"
+            
+            # Create comparison report
+            cat > coverage-comparison.md << EOF
+          ## Coverage Comparison
+
+          | Branch | Coverage | Change |
+          |--------|----------|--------|
+          | Base | $BASE_COVERAGE% | - |
+          | Current | $CURRENT_COVERAGE% | $DIFF% |
+          EOF
+            
+            if (( $(echo "$DIFF < 0" | bc -l) )); then
+              echo "⚠️  Coverage decreased by $DIFF%"
+              echo "COVERAGE_DECREASED=true" >> $GITHUB_ENV
+            else
+              echo "✅ Coverage maintained or improved by $DIFF%"
+            fi
+          else
+            echo "No base coverage found for comparison"
+          fi
+
+      - name: Fail on Coverage Decrease
+        if: env.COVERAGE_DECREASED == 'true'
+        run: |
+          echo "❌ COVERAGE REGRESSION DETECTED"
+          echo ""
+          echo "Test coverage has decreased compared to the base branch."
+          echo "This is not allowed for node-grocy v1.0.0 refactoring."
+          echo ""
+          echo "Please add tests to maintain or improve coverage."
+          exit 1
+
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage/
+            coverage-summary.md
+            coverage-comparison.md
+          retention-days: 30
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            let comment = `## 📊 Test Coverage Report\n\n`;
+            comment += `**Coverage**: ${{ env.COVERAGE_PERCENTAGE }}%\n`;
+            comment += `**Threshold**: 95%\n`;
+            comment += `**Status**: ${{ env.COVERAGE_PERCENTAGE >= 95 && '✅ PASSED' || '❌ FAILED' }}\n\n`;
+
+            // Add comparison if available
+            if (fs.existsSync('coverage-comparison.md')) {
+              const comparison = fs.readFileSync('coverage-comparison.md', 'utf8');
+              comment += comparison + '\n\n';
+            }
+
+            comment += `📈 [View detailed coverage report](${context.payload.pull_request.html_url}/checks)\n\n`;
+            comment += `---\n`;
+            comment += `*This comment was automatically generated by the Test Coverage workflow*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Cache Coverage Results
+        uses: actions/cache@v4
+        with:
+          path: coverage/
+          key: coverage-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            coverage-${{ runner.os }}-

@@ -2,171 +2,171 @@ name: Immutability Check
 
 on:
   push:
-    branches: [ main, feature/v1-refactoring ]
+    branches: [main, feature/v1-refactoring]
   pull_request:
-    branches: [ main, feature/v1-refactoring ]
+    branches: [main, feature/v1-refactoring]
 
 jobs:
   immutability:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Use Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20.x'
-        cache: 'npm'
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
 
-    - name: Install dependencies
-      run: |
-        npm ci
-        # Install ESLint and functional programming plugins if not present
-        npm list eslint || npm install --no-save eslint@latest
-        npm list eslint-plugin-functional || npm install --no-save eslint-plugin-functional@latest
-        npm list @typescript-eslint/parser || npm install --no-save @typescript-eslint/parser@latest
-        npm list @typescript-eslint/eslint-plugin || npm install --no-save @typescript-eslint/eslint-plugin@latest
+      - name: Install dependencies
+        run: |
+          npm ci
+          # Install ESLint and functional programming plugins if not present
+          npm list eslint || npm install --no-save eslint@latest
+          npm list eslint-plugin-functional || npm install --no-save eslint-plugin-functional@latest
+          npm list @typescript-eslint/parser || npm install --no-save @typescript-eslint/parser@latest
+          npm list @typescript-eslint/eslint-plugin || npm install --no-save @typescript-eslint/eslint-plugin@latest
 
-    - name: Setup ESLint for Immutability
-      run: |
-        # Create ESLint flat config for ESLint 9.x compatibility
-        cat > eslint.config.immutability.mjs << 'EOF'
-        import functional from 'eslint-plugin-functional';
-        
-        export default [
-          {
-            languageOptions: {
-              ecmaVersion: 2022,
-              sourceType: 'module',
-              globals: {
-                console: 'readonly',
-                process: 'readonly',
-                Buffer: 'readonly',
-                __dirname: 'readonly',
-                __filename: 'readonly',
-                global: 'readonly',
-                require: 'readonly',
-                module: 'readonly',
-                exports: 'readonly'
+      - name: Setup ESLint for Immutability
+        run: |
+          # Create ESLint flat config for ESLint 9.x compatibility
+          cat > eslint.config.immutability.mjs << 'EOF'
+          import functional from 'eslint-plugin-functional';
+
+          export default [
+            {
+              languageOptions: {
+                ecmaVersion: 2022,
+                sourceType: 'module',
+                globals: {
+                  console: 'readonly',
+                  process: 'readonly',
+                  Buffer: 'readonly',
+                  __dirname: 'readonly',
+                  __filename: 'readonly',
+                  global: 'readonly',
+                  require: 'readonly',
+                  module: 'readonly',
+                  exports: 'readonly'
+                }
+              },
+              plugins: {
+                functional
+              },
+              rules: {
+                'functional/immutable-data': 'error',
+                'functional/no-let': 'error', 
+                'no-var': 'error',
+                'prefer-const': 'error'
               }
             },
-            plugins: {
-              functional
-            },
-            rules: {
-              'functional/immutable-data': 'error',
-              'functional/no-let': 'error', 
-              'no-var': 'error',
-              'prefer-const': 'error'
+            {
+              files: ['*.test.js', '*.test.mjs', '**/*.test.*'],
+              rules: {
+                'functional/immutable-data': 'off',
+                'functional/no-let': 'off'
+              }
             }
-          },
-          {
-            files: ['*.test.js', '*.test.mjs', '**/*.test.*'],
-            rules: {
-              'functional/immutable-data': 'off',
-              'functional/no-let': 'off'
-            }
-          }
-        ];
-        EOF
+          ];
+          EOF
 
-    - name: Run Immutability Check
-      run: |
-        echo "🚨 CRITICAL: Checking for mutations - node-grocy v1.0.0 MUST be immutable"
-        echo "=============================================================="
-        
-        # Check current JavaScript files for mutations
-        echo "Checking for .mjs and .js files..."
-        find . -maxdepth 1 -name "*.mjs" -o -name "*.js" | head -5
-        
-        # Run ESLint on .mjs files (which we know exist)
-        VIOLATIONS_FOUND=0
-        if ls *.mjs 1> /dev/null 2>&1; then
-          echo "Running immutability check on .mjs files..."
-          
-          # Run ESLint and capture the exit code
-          npx eslint --config eslint.config.immutability.mjs index.mjs --format=stylish || VIOLATIONS_FOUND=$?
-          
-          if [ $VIOLATIONS_FOUND -ne 0 ]; then
-            echo ""
-            echo "⚠️ IMMUTABILITY VIOLATIONS DETECTED IN LEGACY CODE"
-            echo "======================================================"
-            echo "The existing index.mjs contains mutations that violate immutability principles."
-            echo "This is EXPECTED during the v1.0.0 refactoring process."
-            echo ""
-            echo "📋 These violations will be addressed during refactoring:"
-            echo "  • Use const instead of let/var"
-            echo "  • Use spread operator for object updates: {...obj, newProp}"
-            echo "  • Use array methods like concat, filter, map instead of push, pop"
-            echo "  • Mark function parameters as Readonly<T>"
-            echo ""
-            echo "🎯 For NEW code in this PR: All new code MUST be immutable."
-            echo "See CLAUDE.md for immutability guidelines."
-            echo ""
-            echo "✅ GitOps workflow implementation PR - legacy violations acknowledged"
+      - name: Run Immutability Check
+        run: |
+          echo "🚨 CRITICAL: Checking for mutations - node-grocy v1.0.0 MUST be immutable"
+          echo "=============================================================="
+
+          # Check current JavaScript files for mutations
+          echo "Checking for .mjs and .js files..."
+          find . -maxdepth 1 -name "*.mjs" -o -name "*.js" | head -5
+
+          # Run ESLint on .mjs files (which we know exist)
+          VIOLATIONS_FOUND=0
+          if ls *.mjs 1> /dev/null 2>&1; then
+            echo "Running immutability check on .mjs files..."
+            
+            # Run ESLint and capture the exit code
+            npx eslint --config eslint.config.immutability.mjs index.mjs --format=stylish || VIOLATIONS_FOUND=$?
+            
+            if [ $VIOLATIONS_FOUND -ne 0 ]; then
+              echo ""
+              echo "⚠️ IMMUTABILITY VIOLATIONS DETECTED IN LEGACY CODE"
+              echo "======================================================"
+              echo "The existing index.mjs contains mutations that violate immutability principles."
+              echo "This is EXPECTED during the v1.0.0 refactoring process."
+              echo ""
+              echo "📋 These violations will be addressed during refactoring:"
+              echo "  • Use const instead of let/var"
+              echo "  • Use spread operator for object updates: {...obj, newProp}"
+              echo "  • Use array methods like concat, filter, map instead of push, pop"
+              echo "  • Mark function parameters as Readonly<T>"
+              echo ""
+              echo "🎯 For NEW code in this PR: All new code MUST be immutable."
+              echo "See CLAUDE.md for immutability guidelines."
+              echo ""
+              echo "✅ GitOps workflow implementation PR - legacy violations acknowledged"
+            else
+              echo "✅ All files pass immutability checks!"
+            fi
           else
-            echo "✅ All files pass immutability checks!"
+            echo "✅ No .mjs files found to check"
           fi
-        else
-          echo "✅ No .mjs files found to check"
-        fi
 
-    - name: Check for Mutation Keywords
-      run: |
-        echo "Scanning for common mutation patterns..."
-        
-        # Scan for dangerous mutation patterns
-        VIOLATIONS=$(grep -n -E "(\.push\(|\.pop\(|\.shift\(|\.unshift\(|\.splice\(|\.sort\(|\.reverse\()" *.mjs *.js 2>/dev/null || true)
-        
-        if [ ! -z "$VIOLATIONS" ]; then
-          echo "❌ MUTATION METHODS DETECTED:"
-          echo "$VIOLATIONS"
-          echo ""
-          echo "Replace with immutable alternatives:"
-          echo "  • array.push(item) → [...array, item]"
-          echo "  • array.pop() → array.slice(0, -1)"
-          echo "  • array.sort() → [...array].sort()"
-          exit 1
-        fi
-        
-        echo "✅ No mutation methods found!"
+      - name: Check for Mutation Keywords
+        run: |
+          echo "Scanning for common mutation patterns..."
 
-    - name: Validate Object Mutations
-      run: |
-        echo "Checking for direct object mutations..."
-        
-        # Look for direct property assignments (basic pattern)
-        ASSIGNMENTS=$(grep -n -E "^\s*[a-zA-Z_$][a-zA-Z0-9_$]*\.[a-zA-Z_$][a-zA-Z0-9_$]*\s*=" *.mjs *.js 2>/dev/null | grep -v "module.exports" | grep -v "// eslint-disable" || true)
-        
-        if [ ! -z "$ASSIGNMENTS" ]; then
-          echo "⚠️  POTENTIAL OBJECT MUTATIONS DETECTED:"
-          echo "$ASSIGNMENTS"
-          echo ""
-          echo "Verify these are not mutations. Use spread operator for updates:"
-          echo "  • obj.prop = val → obj = {...obj, prop: val}"
-        fi
-        
-        echo "✅ Object mutation check completed!"
+          # Scan for dangerous mutation patterns
+          VIOLATIONS=$(grep -n -E "(\.push\(|\.pop\(|\.shift\(|\.unshift\(|\.splice\(|\.sort\(|\.reverse\()" *.mjs *.js 2>/dev/null || true)
 
-    - name: Generate Immutability Report
-      run: |
-        echo "# Immutability Check Report" > immutability-report.md
-        echo "Generated on: $(date)" >> immutability-report.md
-        echo "" >> immutability-report.md
-        echo "## Summary" >> immutability-report.md
-        echo "- ✅ ESLint functional rules: PASSED" >> immutability-report.md
-        echo "- ✅ Mutation method scan: PASSED" >> immutability-report.md
-        echo "- ✅ Object mutation scan: PASSED" >> immutability-report.md
-        echo "" >> immutability-report.md
-        echo "## Files Checked" >> immutability-report.md
-        find . -name "*.mjs" -o -name "*.js" | grep -v node_modules | sort >> immutability-report.md
-        
-        echo "✅ Immutability report generated!"
+          if [ ! -z "$VIOLATIONS" ]; then
+            echo "❌ MUTATION METHODS DETECTED:"
+            echo "$VIOLATIONS"
+            echo ""
+            echo "Replace with immutable alternatives:"
+            echo "  • array.push(item) → [...array, item]"
+            echo "  • array.pop() → array.slice(0, -1)"
+            echo "  • array.sort() → [...array].sort()"
+            exit 1
+          fi
 
-    - name: Upload Immutability Report
-      uses: actions/upload-artifact@v4
-      with:
-        name: immutability-report
-        path: immutability-report.md
-        retention-days: 30
+          echo "✅ No mutation methods found!"
+
+      - name: Validate Object Mutations
+        run: |
+          echo "Checking for direct object mutations..."
+
+          # Look for direct property assignments (basic pattern)
+          ASSIGNMENTS=$(grep -n -E "^\s*[a-zA-Z_$][a-zA-Z0-9_$]*\.[a-zA-Z_$][a-zA-Z0-9_$]*\s*=" *.mjs *.js 2>/dev/null | grep -v "module.exports" | grep -v "// eslint-disable" || true)
+
+          if [ ! -z "$ASSIGNMENTS" ]; then
+            echo "⚠️  POTENTIAL OBJECT MUTATIONS DETECTED:"
+            echo "$ASSIGNMENTS"
+            echo ""
+            echo "Verify these are not mutations. Use spread operator for updates:"
+            echo "  • obj.prop = val → obj = {...obj, prop: val}"
+          fi
+
+          echo "✅ Object mutation check completed!"
+
+      - name: Generate Immutability Report
+        run: |
+          echo "# Immutability Check Report" > immutability-report.md
+          echo "Generated on: $(date)" >> immutability-report.md
+          echo "" >> immutability-report.md
+          echo "## Summary" >> immutability-report.md
+          echo "- ✅ ESLint functional rules: PASSED" >> immutability-report.md
+          echo "- ✅ Mutation method scan: PASSED" >> immutability-report.md
+          echo "- ✅ Object mutation scan: PASSED" >> immutability-report.md
+          echo "" >> immutability-report.md
+          echo "## Files Checked" >> immutability-report.md
+          find . -name "*.mjs" -o -name "*.js" | grep -v node_modules | sort >> immutability-report.md
+
+          echo "✅ Immutability report generated!"
+
+      - name: Upload Immutability Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: immutability-report
+          path: immutability-report.md
+          retention-days: 30

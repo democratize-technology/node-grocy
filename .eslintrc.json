@@ -1,13 +1,7 @@
 {
   "root": true,
-  "extends": [
-    "eslint:recommended",
-    "prettier"
-  ],
-  "plugins": [
-    "functional",
-    "jsdoc"
-  ],
+  "extends": ["eslint:recommended", "prettier"],
+  "plugins": ["functional", "jsdoc"],
   "parser": "espree",
   "parserOptions": {
     "ecmaVersion": 2022,
@@ -28,13 +22,16 @@
     "no-var": "error",
     "eqeqeq": ["error", "always"],
     "curly": ["error", "all"],
-    "jsdoc/require-jsdoc": ["warn", {
-      "require": {
-        "FunctionDeclaration": true,
-        "MethodDefinition": true,
-        "ClassDeclaration": true
+    "jsdoc/require-jsdoc": [
+      "warn",
+      {
+        "require": {
+          "FunctionDeclaration": true,
+          "MethodDefinition": true,
+          "ClassDeclaration": true
+        }
       }
-    }],
+    ],
     "no-restricted-syntax": [
       "error",
       {

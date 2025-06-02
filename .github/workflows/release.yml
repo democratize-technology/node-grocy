@@ -17,293 +17,293 @@ jobs:
     outputs:
       version: ${{ steps.get-version.outputs.version }}
       is-prerelease: ${{ steps.get-version.outputs.is-prerelease }}
-    
+
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Use Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20.x'
-        cache: 'npm'
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
 
-    - name: Install dependencies
-      run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Extract version information
-      id: get-version
-      run: |
-        if [[ $GITHUB_REF == refs/tags/* ]]; then
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          
-          # Check if this is a pre-release
-          if [[ $VERSION == *"-"* ]]; then
-            echo "is-prerelease=true" >> $GITHUB_OUTPUT
+      - name: Extract version information
+        id: get-version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            
+            # Check if this is a pre-release
+            if [[ $VERSION == *"-"* ]]; then
+              echo "is-prerelease=true" >> $GITHUB_OUTPUT
+            else
+              echo "is-prerelease=false" >> $GITHUB_OUTPUT
+            fi
           else
-            echo "is-prerelease=false" >> $GITHUB_OUTPUT
+            echo "version=unknown" >> $GITHUB_OUTPUT
+            echo "is-prerelease=true" >> $GITHUB_OUTPUT
           fi
-        else
-          echo "version=unknown" >> $GITHUB_OUTPUT
-          echo "is-prerelease=true" >> $GITHUB_OUTPUT
-        fi
 
-    - name: Validate version consistency
-      run: |
-        PACKAGE_VERSION=$(jq -r '.version' package.json)
-        TAG_VERSION="${{ steps.get-version.outputs.version }}"
-        
-        if [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
-          echo "❌ Version mismatch!"
-          echo "package.json: $PACKAGE_VERSION"
-          echo "Git tag: $TAG_VERSION"
-          exit 1
-        fi
-        
-        echo "✅ Version consistency validated: $PACKAGE_VERSION"
+      - name: Validate version consistency
+        run: |
+          PACKAGE_VERSION=$(jq -r '.version' package.json)
+          TAG_VERSION="${{ steps.get-version.outputs.version }}"
 
-    - name: Run comprehensive test suite
-      run: |
-        set -euo pipefail
-        echo "🧪 Running comprehensive test suite..."
-        npm test
-        
-        echo "✅ All tests passed!"
+          if [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
+            echo "❌ Version mismatch!"
+            echo "package.json: $PACKAGE_VERSION"
+            echo "Git tag: $TAG_VERSION"
+            exit 1
+          fi
 
-    - name: Run immutability checks
-      run: |
-        set -euo pipefail
-        echo "🚨 Running immutability validation..."
-        
-        # Install ESLint if not available
-        npm list eslint || npm install --no-save eslint@latest
-        npm list eslint-plugin-functional || npm install --no-save eslint-plugin-functional@latest
-        
-        # Create minimal ESLint config for release validation
-        cat > .eslintrc.release.json << 'EOF'
-        {
-          "env": { "node": true, "es2022": true },
-          "plugins": ["functional"],
-          "rules": {
-            "functional/immutable-data": "error",
-            "functional/no-let": "error"
-          },
-          "overrides": [{
-            "files": ["*.test.*"],
+          echo "✅ Version consistency validated: $PACKAGE_VERSION"
+
+      - name: Run comprehensive test suite
+        run: |
+          set -euo pipefail
+          echo "🧪 Running comprehensive test suite..."
+          npm test
+
+          echo "✅ All tests passed!"
+
+      - name: Run immutability checks
+        run: |
+          set -euo pipefail
+          echo "🚨 Running immutability validation..."
+
+          # Install ESLint if not available
+          npm list eslint || npm install --no-save eslint@latest
+          npm list eslint-plugin-functional || npm install --no-save eslint-plugin-functional@latest
+
+          # Create minimal ESLint config for release validation
+          cat > .eslintrc.release.json << 'EOF'
+          {
+            "env": { "node": true, "es2022": true },
+            "plugins": ["functional"],
             "rules": {
-              "functional/immutable-data": "off",
-              "functional/no-let": "off"
-            }
-          }]
-        }
-        EOF
-        
-        # Run immutability checks
-        npx eslint --config .eslintrc.release.json "*.mjs" "*.js" --format=stylish || {
-          echo "❌ Immutability violations detected! Cannot release."
-          exit 1
-        }
-        
-        echo "✅ Immutability validation passed!"
+              "functional/immutable-data": "error",
+              "functional/no-let": "error"
+            },
+            "overrides": [{
+              "files": ["*.test.*"],
+              "rules": {
+                "functional/immutable-data": "off",
+                "functional/no-let": "off"
+              }
+            }]
+          }
+          EOF
 
-    - name: Security audit
-      run: |
-        set -euo pipefail
-        echo "🛡️ Running security audit..."
-        npm audit --audit-level=high || {
-          echo "❌ High-severity security vulnerabilities detected!"
-          exit 1
-        }
-        echo "✅ Security audit passed!"
+          # Run immutability checks
+          npx eslint --config .eslintrc.release.json "*.mjs" "*.js" --format=stylish || {
+            echo "❌ Immutability violations detected! Cannot release."
+            exit 1
+          }
 
-    - name: Build artifacts
-      run: |
-        set -euo pipefail
-        echo "🔨 Building release artifacts..."
-        
-        # If TypeScript build exists, run it
-        if [ -f "tsconfig.json" ]; then
-          npm list typescript || npm install --no-save typescript@latest
-          npx tsc --noEmit || echo "TypeScript check completed"
-        fi
-        
-        # Create dist directory and package files if needed
-        mkdir -p dist
-        
-        # Copy main files to dist for packaging
-        cp index.mjs dist/ 2>/dev/null || echo "Main file copied"
-        cp package.json dist/ 2>/dev/null || echo "Package.json copied"
-        cp README.md dist/ 2>/dev/null || echo "README copied"
-        cp LICENSE dist/ 2>/dev/null || echo "LICENSE copied"
-        
-        echo "✅ Build artifacts created!"
+          echo "✅ Immutability validation passed!"
+
+      - name: Security audit
+        run: |
+          set -euo pipefail
+          echo "🛡️ Running security audit..."
+          npm audit --audit-level=high || {
+            echo "❌ High-severity security vulnerabilities detected!"
+            exit 1
+          }
+          echo "✅ Security audit passed!"
+
+      - name: Build artifacts
+        run: |
+          set -euo pipefail
+          echo "🔨 Building release artifacts..."
+
+          # If TypeScript build exists, run it
+          if [ -f "tsconfig.json" ]; then
+            npm list typescript || npm install --no-save typescript@latest
+            npx tsc --noEmit || echo "TypeScript check completed"
+          fi
+
+          # Create dist directory and package files if needed
+          mkdir -p dist
+
+          # Copy main files to dist for packaging
+          cp index.mjs dist/ 2>/dev/null || echo "Main file copied"
+          cp package.json dist/ 2>/dev/null || echo "Package.json copied"
+          cp README.md dist/ 2>/dev/null || echo "README copied"
+          cp LICENSE dist/ 2>/dev/null || echo "LICENSE copied"
+
+          echo "✅ Build artifacts created!"
 
   publish:
     needs: quality-gates
     runs-on: ubuntu-latest
     name: Publish Release
     environment: production
-    
+
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Use Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20.x'
-        registry-url: 'https://registry.npmjs.org'
-        cache: 'npm'
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
 
-    - name: Install dependencies
-      run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Generate changelog
-      run: |
-        echo "📝 Generating changelog for v${{ needs.quality-gates.outputs.version }}..."
-        
-        # Create changelog entry
-        cat > RELEASE_CHANGELOG.md << 'EOF'
-        # Release Notes: v${{ needs.quality-gates.outputs.version }}
-        
-        **Release Date**: $(date)
-        **Release Type**: ${{ needs.quality-gates.outputs.is-prerelease == 'true' && 'Pre-release' || 'Stable Release' }}
-        
-        ## 🎯 Release Highlights
-        
-        EOF
-        
-        # Add release type specific content
-        if [ "${{ needs.quality-gates.outputs.is-prerelease }}" = "true" ]; then
-          echo "This is a pre-release version of node-grocy v1.0.0 refactoring." >> RELEASE_CHANGELOG.md
+      - name: Generate changelog
+        run: |
+          echo "📝 Generating changelog for v${{ needs.quality-gates.outputs.version }}..."
+
+          # Create changelog entry
+          cat > RELEASE_CHANGELOG.md << 'EOF'
+          # Release Notes: v${{ needs.quality-gates.outputs.version }}
+
+          **Release Date**: $(date)
+          **Release Type**: ${{ needs.quality-gates.outputs.is-prerelease == 'true' && 'Pre-release' || 'Stable Release' }}
+
+          ## 🎯 Release Highlights
+
+          EOF
+
+          # Add release type specific content
+          if [ "${{ needs.quality-gates.outputs.is-prerelease }}" = "true" ]; then
+            echo "This is a pre-release version of node-grocy v1.0.0 refactoring." >> RELEASE_CHANGELOG.md
+            echo "" >> RELEASE_CHANGELOG.md
+            echo "⚠️ **Pre-release Notice**: This version is for testing and development. Not recommended for production use." >> RELEASE_CHANGELOG.md
+          else
+            echo "This is a stable release of node-grocy." >> RELEASE_CHANGELOG.md
+          fi
+
           echo "" >> RELEASE_CHANGELOG.md
-          echo "⚠️ **Pre-release Notice**: This version is for testing and development. Not recommended for production use." >> RELEASE_CHANGELOG.md
-        else
-          echo "This is a stable release of node-grocy." >> RELEASE_CHANGELOG.md
-        fi
-        
-        echo "" >> RELEASE_CHANGELOG.md
-        echo "## ✅ Quality Metrics" >> RELEASE_CHANGELOG.md
-        echo "" >> RELEASE_CHANGELOG.md
-        echo "- ✅ All tests passed" >> RELEASE_CHANGELOG.md
-        echo "- ✅ Immutability validation passed" >> RELEASE_CHANGELOG.md
-        echo "- ✅ Security audit passed" >> RELEASE_CHANGELOG.md
-        echo "- ✅ Version consistency validated" >> RELEASE_CHANGELOG.md
-        
-        echo "" >> RELEASE_CHANGELOG.md
-        echo "## 📦 Installation" >> RELEASE_CHANGELOG.md
-        echo "" >> RELEASE_CHANGELOG.md
-        echo "\`\`\`bash" >> RELEASE_CHANGELOG.md
-        echo "npm install node-grocy@${{ needs.quality-gates.outputs.version }}" >> RELEASE_CHANGELOG.md
-        echo "\`\`\`" >> RELEASE_CHANGELOG.md
-        
-        echo "" >> RELEASE_CHANGELOG.md
-        echo "## 🔗 Resources" >> RELEASE_CHANGELOG.md
-        echo "" >> RELEASE_CHANGELOG.md
-        echo "- [Documentation](https://democratize-technology.github.io/node-grocy/)" >> RELEASE_CHANGELOG.md
-        echo "- [NPM Package](https://www.npmjs.com/package/node-grocy)" >> RELEASE_CHANGELOG.md
-        echo "- [GitHub Repository](https://github.com/democratize-technology/node-grocy)" >> RELEASE_CHANGELOG.md
-        
-        if [ "${{ needs.quality-gates.outputs.is-prerelease }}" = "true" ]; then
+          echo "## ✅ Quality Metrics" >> RELEASE_CHANGELOG.md
           echo "" >> RELEASE_CHANGELOG.md
-          echo "## 🚧 v1.0.0 Refactoring Progress" >> RELEASE_CHANGELOG.md
+          echo "- ✅ All tests passed" >> RELEASE_CHANGELOG.md
+          echo "- ✅ Immutability validation passed" >> RELEASE_CHANGELOG.md
+          echo "- ✅ Security audit passed" >> RELEASE_CHANGELOG.md
+          echo "- ✅ Version consistency validated" >> RELEASE_CHANGELOG.md
+
           echo "" >> RELEASE_CHANGELOG.md
-          echo "This pre-release is part of the ongoing v1.0.0 refactoring project:" >> RELEASE_CHANGELOG.md
+          echo "## 📦 Installation" >> RELEASE_CHANGELOG.md
           echo "" >> RELEASE_CHANGELOG.md
-          echo "- **Target**: Transform 19,843-line monolith to modular TypeScript architecture" >> RELEASE_CHANGELOG.md
-          echo "- **Principle**: Immutability-first development" >> RELEASE_CHANGELOG.md
-          echo "- **Features**: Full TypeScript support, service-based architecture, comprehensive validation" >> RELEASE_CHANGELOG.md
-        fi
-        
-        echo "✅ Changelog generated!"
+          echo "\`\`\`bash" >> RELEASE_CHANGELOG.md
+          echo "npm install node-grocy@${{ needs.quality-gates.outputs.version }}" >> RELEASE_CHANGELOG.md
+          echo "\`\`\`" >> RELEASE_CHANGELOG.md
 
-    - name: Publish to NPM
-      run: |
-        echo "📦 Publishing to NPM..."
-        
-        # Set npm registry and authentication
-        npm config set registry https://registry.npmjs.org/
-        
-        # Publish with appropriate tag
-        if [ "${{ needs.quality-gates.outputs.is-prerelease }}" = "true" ]; then
-          echo "Publishing as pre-release with 'beta' tag..."
-          npm publish --tag beta
-        else
-          echo "Publishing as stable release with 'latest' tag..."
-          npm publish --tag latest
-        fi
-        
-        echo "✅ Published to NPM successfully!"
-      env:
-        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          echo "" >> RELEASE_CHANGELOG.md
+          echo "## 🔗 Resources" >> RELEASE_CHANGELOG.md
+          echo "" >> RELEASE_CHANGELOG.md
+          echo "- [Documentation](https://democratize-technology.github.io/node-grocy/)" >> RELEASE_CHANGELOG.md
+          echo "- [NPM Package](https://www.npmjs.com/package/node-grocy)" >> RELEASE_CHANGELOG.md
+          echo "- [GitHub Repository](https://github.com/democratize-technology/node-grocy)" >> RELEASE_CHANGELOG.md
 
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
-      with:
-        name: "node-grocy v${{ needs.quality-gates.outputs.version }}"
-        body_path: RELEASE_CHANGELOG.md
-        draft: false
-        prerelease: ${{ needs.quality-gates.outputs.is-prerelease }}
-        generate_release_notes: true
-        files: |
-          dist/*
-          RELEASE_CHANGELOG.md
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          if [ "${{ needs.quality-gates.outputs.is-prerelease }}" = "true" ]; then
+            echo "" >> RELEASE_CHANGELOG.md
+            echo "## 🚧 v1.0.0 Refactoring Progress" >> RELEASE_CHANGELOG.md
+            echo "" >> RELEASE_CHANGELOG.md
+            echo "This pre-release is part of the ongoing v1.0.0 refactoring project:" >> RELEASE_CHANGELOG.md
+            echo "" >> RELEASE_CHANGELOG.md
+            echo "- **Target**: Transform 19,843-line monolith to modular TypeScript architecture" >> RELEASE_CHANGELOG.md
+            echo "- **Principle**: Immutability-first development" >> RELEASE_CHANGELOG.md
+            echo "- **Features**: Full TypeScript support, service-based architecture, comprehensive validation" >> RELEASE_CHANGELOG.md
+          fi
 
-    - name: Update documentation
-      if: needs.quality-gates.outputs.is-prerelease == 'false'
-      run: |
-        echo "📚 Triggering documentation update..."
-        
-        # Trigger docs workflow (this would normally trigger the docs.yml workflow)
-        echo "Documentation will be automatically updated by the docs workflow"
+          echo "✅ Changelog generated!"
 
-    - name: Notify release completion
-      run: |
-        echo "🎉 Release v${{ needs.quality-gates.outputs.version }} completed successfully!"
-        echo ""
-        echo "Release Summary:"
-        echo "- Version: ${{ needs.quality-gates.outputs.version }}"
-        echo "- Type: ${{ needs.quality-gates.outputs.is-prerelease == 'true' && 'Pre-release' || 'Stable' }}"
-        echo "- NPM Tag: ${{ needs.quality-gates.outputs.is-prerelease == 'true' && 'beta' || 'latest' }}"
-        echo "- Quality Gates: ✅ Passed"
-        echo ""
-        echo "🔗 Links:"
-        echo "- NPM: https://www.npmjs.com/package/node-grocy/v/${{ needs.quality-gates.outputs.version }}"
-        echo "- GitHub Release: ${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ needs.quality-gates.outputs.version }}"
+      - name: Publish to NPM
+        run: |
+          echo "📦 Publishing to NPM..."
+
+          # Set npm registry and authentication
+          npm config set registry https://registry.npmjs.org/
+
+          # Publish with appropriate tag
+          if [ "${{ needs.quality-gates.outputs.is-prerelease }}" = "true" ]; then
+            echo "Publishing as pre-release with 'beta' tag..."
+            npm publish --tag beta
+          else
+            echo "Publishing as stable release with 'latest' tag..."
+            npm publish --tag latest
+          fi
+
+          echo "✅ Published to NPM successfully!"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: 'node-grocy v${{ needs.quality-gates.outputs.version }}'
+          body_path: RELEASE_CHANGELOG.md
+          draft: false
+          prerelease: ${{ needs.quality-gates.outputs.is-prerelease }}
+          generate_release_notes: true
+          files: |
+            dist/*
+            RELEASE_CHANGELOG.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update documentation
+        if: needs.quality-gates.outputs.is-prerelease == 'false'
+        run: |
+          echo "📚 Triggering documentation update..."
+
+          # Trigger docs workflow (this would normally trigger the docs.yml workflow)
+          echo "Documentation will be automatically updated by the docs workflow"
+
+      - name: Notify release completion
+        run: |
+          echo "🎉 Release v${{ needs.quality-gates.outputs.version }} completed successfully!"
+          echo ""
+          echo "Release Summary:"
+          echo "- Version: ${{ needs.quality-gates.outputs.version }}"
+          echo "- Type: ${{ needs.quality-gates.outputs.is-prerelease == 'true' && 'Pre-release' || 'Stable' }}"
+          echo "- NPM Tag: ${{ needs.quality-gates.outputs.is-prerelease == 'true' && 'beta' || 'latest' }}"
+          echo "- Quality Gates: ✅ Passed"
+          echo ""
+          echo "🔗 Links:"
+          echo "- NPM: https://www.npmjs.com/package/node-grocy/v/${{ needs.quality-gates.outputs.version }}"
+          echo "- GitHub Release: ${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ needs.quality-gates.outputs.version }}"
 
   post-release:
     needs: [quality-gates, publish]
     runs-on: ubuntu-latest
     name: Post-Release Tasks
     if: always()
-    
+
     steps:
-    - name: Release status summary
-      run: |
-        echo "📊 Release Status Summary"
-        echo "========================"
-        echo "Version: ${{ needs.quality-gates.outputs.version }}"
-        echo "Quality Gates: ${{ needs.quality-gates.result }}"
-        echo "Publish: ${{ needs.publish.result }}"
-        echo ""
-        
-        if [ "${{ needs.publish.result }}" = "success" ]; then
-          echo "✅ Release completed successfully!"
+      - name: Release status summary
+        run: |
+          echo "📊 Release Status Summary"
+          echo "========================"
+          echo "Version: ${{ needs.quality-gates.outputs.version }}"
+          echo "Quality Gates: ${{ needs.quality-gates.result }}"
+          echo "Publish: ${{ needs.publish.result }}"
           echo ""
-          echo "Next steps:"
-          echo "1. Monitor NPM download metrics"
-          echo "2. Update documentation if needed"
-          echo "3. Announce release to community"
-          echo "4. Monitor for issues and feedback"
-        else
-          echo "❌ Release failed!"
-          echo ""
-          echo "Please check the workflow logs and:"
-          echo "1. Verify all quality gates passed"
-          echo "2. Check NPM authentication"
-          echo "3. Ensure version consistency"
-          echo "4. Review security audit results"
-        fi
+
+          if [ "${{ needs.publish.result }}" = "success" ]; then
+            echo "✅ Release completed successfully!"
+            echo ""
+            echo "Next steps:"
+            echo "1. Monitor NPM download metrics"
+            echo "2. Update documentation if needed"
+            echo "3. Announce release to community"
+            echo "4. Monitor for issues and feedback"
+          else
+            echo "❌ Release failed!"
+            echo ""
+            echo "Please check the workflow logs and:"
+            echo "1. Verify all quality gates passed"
+            echo "2. Check NPM authentication"
+            echo "3. Ensure version consistency"
+            echo "4. Review security audit results"
+          fi

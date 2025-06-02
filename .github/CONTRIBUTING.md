@@ -9,6 +9,7 @@ We're transforming node-grocy from a 19,843-line JavaScript monolith into a modu
 ## 🔄 Development Workflow
 
 ### Branch Structure
+
 ```
 main (production)
 └── feature/v1-refactoring (v1.0.0 base branch)
@@ -18,6 +19,7 @@ main (production)
 ```
 
 ### Getting Started
+
 1. **Fork the repository**
 2. **Create feature branch** off `feature/v1-refactoring`:
    ```bash
@@ -34,6 +36,7 @@ Our GitHub Actions workflows enforce quality standards automatically:
 ### Phase 1 - Critical Workflows (Always Required)
 
 #### 🚨 Immutability Check (`immutability-check.yml`)
+
 - **Trigger**: Every push/PR to `feature/v1-refactoring`
 - **Purpose**: Enforces our core principle - NO mutations allowed
 - **Checks**:
@@ -43,19 +46,22 @@ Our GitHub Actions workflows enforce quality standards automatically:
   - Generates immutability report
 
 **What it catches:**
+
 ```javascript
 // ❌ VIOLATIONS - Will fail the build
-product.name = 'new name';           // Object mutation
-items.push(newItem);                 // Array mutation
-let counter = 0; counter++;          // Variable mutation
+product.name = 'new name'; // Object mutation
+items.push(newItem); // Array mutation
+let counter = 0;
+counter++; // Variable mutation
 
 // ✅ CORRECT - Will pass
-product = {...product, name: 'new name'};  // Immutable update
-items = [...items, newItem];               // Immutable array
-const counter = items.length;             // Immutable variable
+product = { ...product, name: 'new name' }; // Immutable update
+items = [...items, newItem]; // Immutable array
+const counter = items.length; // Immutable variable
 ```
 
 #### 📊 Test Coverage (`test-coverage.yml`)
+
 - **Trigger**: Every push/PR to `feature/v1-refactoring`
 - **Purpose**: Maintains 95%+ test coverage requirement
 - **Features**:
@@ -65,11 +71,13 @@ const counter = items.length;             // Immutable variable
   - Fails if coverage decreases
 
 **Requirements:**
+
 - All new code must include comprehensive tests
 - Focus on edge cases and error handling
 - Maintain or improve overall coverage percentage
 
 #### 🛡️ Security Scan (`security.yml`)
+
 - **Trigger**: Push/PR + weekly schedule
 - **Purpose**: Identifies security vulnerabilities
 - **Checks**:
@@ -81,6 +89,7 @@ const counter = items.length;             // Immutable variable
 ### Phase 2 - Migration Support Workflows
 
 #### 📈 TypeScript Migration (`typescript-migration.yml`)
+
 - **Trigger**: Changes to `.js`, `.mjs`, `.ts`, `.tsx` files
 - **Purpose**: Tracks JavaScript → TypeScript conversion progress
 - **Features**:
@@ -90,6 +99,7 @@ const counter = items.length;             // Immutable variable
   - Auto-generates `tsconfig.json` if missing
 
 #### 🔍 API Compatibility (`api-compatibility.yml`)
+
 - **Trigger**: PRs that modify public APIs
 - **Purpose**: Prevents breaking changes during v1.0.0 migration
 - **Features**:
@@ -99,6 +109,7 @@ const counter = items.length;             // Immutable variable
   - Generates migration guidance
 
 #### 🏗️ Architecture Validation (`architecture.yml`)
+
 - **Trigger**: Changes to service files in `src/`
 - **Purpose**: Enforces modular architecture principles
 - **Checks**:
@@ -110,6 +121,7 @@ const counter = items.length;             // Immutable variable
 ### Enhanced Core Workflows
 
 #### ✅ CI Pipeline (`ci.yml`)
+
 - **Trigger**: All pushes and PRs
 - **Features**:
   - Multi-platform testing (Ubuntu, macOS, Windows)
@@ -120,25 +132,27 @@ const counter = items.length;             // Immutable variable
 ## 📝 Development Standards
 
 ### 1. Immutability Requirements (CRITICAL)
+
 **All code MUST be immutable. No exceptions.**
 
 ```typescript
 // ❌ NEVER DO THIS
 function updateStock(stock: Stock[], item: StockItem) {
-  stock.push(item);  // MUTATION!
+  stock.push(item); // MUTATION!
   return stock;
 }
 
 // ✅ ALWAYS DO THIS
 function updateStock(
-  stock: ReadonlyArray<Readonly<Stock>>, 
+  stock: ReadonlyArray<Readonly<Stock>>,
   item: Readonly<StockItem>
 ): ReadonlyArray<Stock> {
-  return [...stock, item];  // Creates new array
+  return [...stock, item]; // Creates new array
 }
 ```
 
 **Key Rules:**
+
 - Use `const` instead of `let/var`
 - Use spread operator for object updates: `{...obj, newProp: value}`
 - Use immutable array methods: `concat()`, `filter()`, `map()`, `slice()`
@@ -149,7 +163,7 @@ function updateStock(
 
 ```typescript
 // ❌ Avoid
-function processData(data: any): any
+function processData(data: any): any;
 
 // ✅ Prefer
 import { z } from 'zod';
@@ -183,7 +197,7 @@ interface IStockService {
 
 class StockService implements IStockService {
   constructor(private readonly httpClient: IHttpClient) {}
-  
+
   async getStock(): Promise<ReadonlyArray<Readonly<StockItem>>> {
     const response = await this.httpClient.get('/stock');
     return Object.freeze(response.data);
@@ -208,9 +222,9 @@ describe('StockService', () => {
     it('should return immutable stock array', async () => {
       const mockData = [{ id: 1, amount: 5 }];
       mockHttpClient.get.mockResolvedValue({ data: mockData });
-      
+
       const result = await service.getStock();
-      
+
       expect(result).toEqual(mockData);
       expect(Object.isFrozen(result)).toBe(true);
     });
@@ -232,6 +246,7 @@ describe('StockService', () => {
 ## 🚀 PR Process
 
 ### 1. Before Submitting
+
 - [ ] All tests pass locally: `npm test`
 - [ ] Code follows immutability principles
 - [ ] New code has 95%+ test coverage
@@ -240,26 +255,33 @@ describe('StockService', () => {
 - [ ] Documentation updated for API changes
 
 ### 2. PR Requirements
+
 ```markdown
 ## Summary
+
 Brief description of changes
 
 ## Related Issue
+
 Fixes #[issue-number]
 
 ## Changes Made
+
 - Specific changes with technical details
 - Architectural decisions explained
 
 ## Testing
+
 - Test coverage details
 - Performance impact assessment
 
 ## Breaking Changes
+
 - List any breaking changes
 - Migration instructions if needed
 
 ## Checklist
+
 - [ ] Tests pass locally
 - [ ] Documentation updated
 - [ ] No breaking changes OR migration guide provided
@@ -267,7 +289,9 @@ Fixes #[issue-number]
 ```
 
 ### 3. Automated Checks
+
 Your PR will automatically be checked by:
+
 - 🚨 **Immutability Check** - Must pass (no mutations)
 - 📊 **Test Coverage** - Must maintain 95%+
 - 🛡️ **Security Scan** - No vulnerabilities
@@ -276,6 +300,7 @@ Your PR will automatically be checked by:
 - 📈 **TypeScript Migration** - Progress tracking
 
 ### 4. Review Process
+
 - **Automated Review**: AI-powered review via Bedrock
 - **Manual Review**: Team member review required
 - **Architecture Review**: For significant changes
@@ -284,11 +309,13 @@ Your PR will automatically be checked by:
 ## 🔧 Local Development Setup
 
 ### Prerequisites
+
 - Node.js 20.x or 22.x
 - npm (comes with Node.js)
 - Git
 
 ### Installation
+
 ```bash
 git clone https://github.com/democratize-technology/node-grocy.git
 cd node-grocy
@@ -297,6 +324,7 @@ npm install
 ```
 
 ### Development Commands
+
 ```bash
 # Run tests
 npm test
@@ -312,6 +340,7 @@ grep -n -E "(\.push\(|\.pop\(|\.shift\()" *.mjs || echo "No mutations found"
 ```
 
 ### TypeScript Setup
+
 ```bash
 # Install TypeScript dependencies
 npm install --save-dev typescript @types/node
@@ -323,69 +352,87 @@ npm install --save-dev typescript @types/node
 ## 🐛 Issue Reporting
 
 ### Bug Reports
+
 Use this template for bug reports:
+
 ```markdown
 ## Bug Description
+
 Clear description of the bug
 
 ## Steps to Reproduce
+
 1. Step one
 2. Step two
 3. Step three
 
 ## Expected Behavior
+
 What should happen
 
 ## Actual Behavior
+
 What actually happens
 
 ## Environment
-- Node.js version: 
+
+- Node.js version:
 - npm version:
 - OS:
 
 ## Additional Context
+
 Any other relevant information
 ```
 
 ### Feature Requests
+
 ```markdown
 ## Feature Description
+
 Clear description of the proposed feature
 
 ## Use Case
+
 Why is this feature needed?
 
 ## Proposed Implementation
+
 High-level implementation approach
 
 ## Breaking Changes
+
 Any potential breaking changes
 
 ## Related Issues
+
 Links to related issues
 ```
 
 ## 📚 Resources
 
 ### Key Documents
+
 - [CLAUDE.md](../CLAUDE.md) - Core development principles
 - [Git Workflow](../docs/git-workflow.md) - Branch strategy details
 - [Code Review Guidelines](.claude/code-review.md) - Review standards
 
 ### External Resources
+
 - [Grocy API Documentation](https://demo.grocy.info/api)
 - [TypeScript Handbook](https://www.typescriptlang.org/docs/)
 - [Functional Programming in TypeScript](https://gcanti.github.io/fp-ts/)
 - [Zod Documentation](https://zod.dev/)
 
 ### Community
+
 - [GitHub Issues](https://github.com/democratize-technology/node-grocy/issues)
 - [Discussions](https://github.com/democratize-technology/node-grocy/discussions)
 
 ## 🎉 Recognition
 
 Contributors who follow these guidelines and help improve node-grocy will be:
+
 - Listed in the CONTRIBUTORS.md file
 - Credited in release notes
 - Invited to join the core team for significant contributions

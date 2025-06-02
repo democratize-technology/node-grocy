@@ -2,7 +2,7 @@ name: Schema Validation
 
 on:
   pull_request:
-    branches: [ feature/v1-refactoring ]
+    branches: [feature/v1-refactoring]
     paths:
       - 'src/schemas/**/*.ts'
       - 'src/schemas/**/*.js'
@@ -17,623 +17,623 @@ permissions:
 jobs:
   schema-validation:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Use Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20.x'
-        cache: 'npm'
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
 
-    - name: Install dependencies
-      run: |
-        npm ci
-        # Install schema validation tools
-        npm list zod || npm install --no-save zod@latest
-        npm list ajv || npm install --no-save ajv@latest
-        npm list @types/node || npm install --no-save @types/node@latest
+      - name: Install dependencies
+        run: |
+          npm ci
+          # Install schema validation tools
+          npm list zod || npm install --no-save zod@latest
+          npm list ajv || npm install --no-save ajv@latest
+          npm list @types/node || npm install --no-save @types/node@latest
 
-    - name: Setup Schema Validation Environment
-      run: |
-        echo "🔍 Setting up schema validation environment..."
-        
-        # Create Grocy API schema definitions if they don't exist
-        mkdir -p src/schemas
-        
-        # Create base Grocy schemas based on API specification
-        cat > src/schemas/grocy-schemas.ts << 'EOF'
-        import { z } from 'zod';
-        
-        // Base Grocy entity schema
-        export const GrocyBaseEntitySchema = z.object({
-          id: z.number().int().positive(),
-          row_created_timestamp: z.string().datetime().optional(),
-          userfields: z.record(z.unknown()).optional()
-        });
-        
-        // Product schema
-        export const GrocyProductSchema = GrocyBaseEntitySchema.extend({
-          name: z.string().min(1).max(255),
-          description: z.string().optional(),
-          location_id: z.number().int().positive().optional(),
-          product_group_id: z.number().int().positive().optional(),
-          qu_id_stock: z.number().int().positive(),
-          qu_id_purchase: z.number().int().positive().optional(),
-          qu_id_consume: z.number().int().positive().optional(),
-          qu_factor_purchase_to_stock: z.number().positive().optional(),
-          qu_factor_consume_to_stock: z.number().positive().optional(),
-          min_stock_amount: z.number().nonnegative().optional(),
-          default_best_before_days: z.number().int().nonnegative().optional(),
-          default_best_before_days_after_open: z.number().int().nonnegative().optional(),
-          default_best_before_days_after_freezing: z.number().int().nonnegative().optional(),
-          default_best_before_days_after_thawing: z.number().int().nonnegative().optional(),
-          picture_file_name: z.string().optional(),
-          allow_partial_units_in_stock: z.boolean().optional(),
-          enable_tare_weight_handling: z.boolean().optional(),
-          tare_weight: z.number().nonnegative().optional(),
-          not_check_stock_fulfillment_for_recipes: z.boolean().optional(),
-          parent_product_id: z.number().int().positive().optional(),
-          calories: z.number().nonnegative().optional(),
-          cumulate_min_stock_amount_of_sub_products: z.boolean().optional(),
-          due_type: z.enum(['expiration', 'best-before']).optional(),
-          quick_consume_amount: z.number().positive().optional(),
-          hide_on_stock_overview: z.boolean().optional()
-        });
-        
-        // Stock entry schema
-        export const GrocyStockEntrySchema = GrocyBaseEntitySchema.extend({
-          product_id: z.number().int().positive(),
-          amount: z.number().nonnegative(),
-          best_before_date: z.string().date().optional(),
-          purchased_date: z.string().date().optional(),
-          stock_id: z.string().optional(),
-          price: z.number().nonnegative().optional(),
-          open: z.boolean().optional(),
-          opened_date: z.string().datetime().optional(),
-          location_id: z.number().int().positive().optional(),
-          shopping_location_id: z.number().int().positive().optional(),
-          note: z.string().optional()
-        });
-        
-        // Shopping list item schema
-        export const GrocyShoppingListItemSchema = GrocyBaseEntitySchema.extend({
-          product_id: z.number().int().positive(),
-          note: z.string().optional(),
-          amount: z.number().positive(),
-          shopping_list_id: z.number().int().positive().optional(),
-          done: z.boolean().optional()
-        });
-        
-        // Recipe schema
-        export const GrocyRecipeSchema = GrocyBaseEntitySchema.extend({
-          name: z.string().min(1).max(255),
-          description: z.string().optional(),
-          instructions: z.string().optional(),
-          picture_file_name: z.string().optional(),
-          base_servings: z.number().int().positive().optional(),
-          desired_servings: z.number().int().positive().optional(),
-          not_check_shoppinglist: z.boolean().optional(),
-          type: z.enum(['normal', 'mealplan']).optional()
-        });
-        
-        // User schema
-        export const GrocyUserSchema = GrocyBaseEntitySchema.extend({
-          username: z.string().min(1).max(255),
-          first_name: z.string().optional(),
-          last_name: z.string().optional(),
-          password: z.string().min(1).optional(),
-          picture_file_name: z.string().optional(),
-          display_name: z.string().optional()
-        });
-        
-        // API request/response schemas
-        export const GrocyApiResponseSchema = z.object({
-          data: z.unknown(),
-          error: z.string().optional(),
-          message: z.string().optional()
-        });
-        
-        export const GrocyErrorResponseSchema = z.object({
-          error_message: z.string(),
-          error_details: z.unknown().optional()
-        });
-        
-        // Type exports
-        export type GrocyProduct = z.infer<typeof GrocyProductSchema>;
-        export type GrocyStockEntry = z.infer<typeof GrocyStockEntrySchema>;
-        export type GrocyShoppingListItem = z.infer<typeof GrocyShoppingListItemSchema>;
-        export type GrocyRecipe = z.infer<typeof GrocyRecipeSchema>;
-        export type GrocyUser = z.infer<typeof GrocyUserSchema>;
-        export type GrocyApiResponse = z.infer<typeof GrocyApiResponseSchema>;
-        export type GrocyErrorResponse = z.infer<typeof GrocyErrorResponseSchema>;
-        
-        // Schema registry for dynamic validation
-        export const GROCY_SCHEMAS = {
-          product: GrocyProductSchema,
-          stockEntry: GrocyStockEntrySchema,
-          shoppingListItem: GrocyShoppingListItemSchema,
-          recipe: GrocyRecipeSchema,
-          user: GrocyUserSchema,
-          apiResponse: GrocyApiResponseSchema,
-          errorResponse: GrocyErrorResponseSchema
-        } as const;
-        EOF
-        
-        echo "✅ Grocy schemas created"
+      - name: Setup Schema Validation Environment
+        run: |
+          echo "🔍 Setting up schema validation environment..."
 
-    - name: Validate Schema Compilation
-      run: |
-        echo "🔧 Validating schema compilation..."
-        
-        # Create schema validation script
-        cat > validate-schemas.mjs << 'EOF'
-        import fs from 'fs';
-        import path from 'path';
-        
-        async function validateSchemas() {
-          const results = {
-            timestamp: new Date().toISOString(),
-            schemasFound: 0,
-            compilationErrors: [],
-            validationErrors: [],
-            typeExports: [],
-            summary: {
-              totalSchemas: 0,
-              validSchemas: 0,
-              errorCount: 0,
-              coveragePercentage: 0
-            }
-          };
-          
-          console.log('Validating Zod schemas...');
-          
-          // Check if schemas directory exists
-          const schemasDir = 'src/schemas';
-          if (!fs.existsSync(schemasDir)) {
-            console.log('No schemas directory found, creating sample structure...');
-            return results;
-          }
-          
-          // Find all schema files
-          const schemaFiles = fs.readdirSync(schemasDir, { recursive: true })
-            .filter(file => typeof file === 'string' && (file.endsWith('.ts') || file.endsWith('.js')))
-            .map(file => path.join(schemasDir, file));
-          
-          results.schemasFound = schemaFiles.length;
-          console.log(`Found ${schemaFiles.length} schema files`);
-          
-          // Validate each schema file
-          for (const schemaFile of schemaFiles) {
-            try {
-              console.log(`Validating ${schemaFile}...`);
-              
-              const content = fs.readFileSync(schemaFile, 'utf8');
-              
-              // Check for Zod imports
-              if (!content.includes('import') || !content.includes('zod')) {
-                results.validationErrors.push({
-                  file: schemaFile,
-                  type: 'missing_zod_import',
-                  message: 'File should import Zod library'
-                });
-              }
-              
-              // Extract schema definitions
-              const schemaMatches = content.match(/export\s+const\s+(\w+Schema)\s*=/g);
-              if (schemaMatches) {
-                schemaMatches.forEach(match => {
-                  const schemaName = match.match(/(\w+Schema)/)[1];
-                  results.typeExports.push(schemaName);
-                });
-              }
-              
-              // Check for type exports
-              const typeMatches = content.match(/export\s+type\s+(\w+)/g);
-              if (typeMatches) {
-                typeMatches.forEach(match => {
-                  const typeName = match.match(/type\s+(\w+)/)[1];
-                  results.typeExports.push(typeName);
-                });
-              }
-              
-              // Validate schema structure (basic check)
-              if (content.includes('z.object') || content.includes('z.string') || content.includes('z.number')) {
-                results.summary.validSchemas++;
-              } else {
-                results.validationErrors.push({
-                  file: schemaFile,
-                  type: 'invalid_schema_structure',
-                  message: 'File does not contain valid Zod schema definitions'
-                });
-              }
-              
-            } catch (error) {
-              results.compilationErrors.push({
-                file: schemaFile,
-                error: error.message
-              });
-              results.summary.errorCount++;
-            }
-          }
-          
-          results.summary.totalSchemas = schemaFiles.length;
-          results.summary.coveragePercentage = schemaFiles.length > 0 
-            ? Math.round((results.summary.validSchemas / schemaFiles.length) * 100)
-            : 0;
-          
-          return results;
-        }
-        
-        // Validate runtime schema functionality
-        async function validateRuntimeSchemas() {
-          console.log('Testing runtime schema validation...');
-          
-          const runtimeResults = {
-            tests: [],
-            passed: 0,
-            failed: 0
-          };
-          
-          try {
-            // Try to import and test schemas
-            const sampleData = {
-              validProduct: {
-                id: 1,
-                name: 'Test Product',
-                qu_id_stock: 1
-              },
-              invalidProduct: {
-                id: -1, // Invalid: negative ID
-                name: '', // Invalid: empty name
-                qu_id_stock: 'invalid' // Invalid: string instead of number
-              },
-              validStockEntry: {
-                id: 1,
-                product_id: 1,
-                amount: 5.5
-              },
-              invalidStockEntry: {
-                id: 1,
-                product_id: 1,
-                amount: -1 // Invalid: negative amount
+          # Create Grocy API schema definitions if they don't exist
+          mkdir -p src/schemas
+
+          # Create base Grocy schemas based on API specification
+          cat > src/schemas/grocy-schemas.ts << 'EOF'
+          import { z } from 'zod';
+
+          // Base Grocy entity schema
+          export const GrocyBaseEntitySchema = z.object({
+            id: z.number().int().positive(),
+            row_created_timestamp: z.string().datetime().optional(),
+            userfields: z.record(z.unknown()).optional()
+          });
+
+          // Product schema
+          export const GrocyProductSchema = GrocyBaseEntitySchema.extend({
+            name: z.string().min(1).max(255),
+            description: z.string().optional(),
+            location_id: z.number().int().positive().optional(),
+            product_group_id: z.number().int().positive().optional(),
+            qu_id_stock: z.number().int().positive(),
+            qu_id_purchase: z.number().int().positive().optional(),
+            qu_id_consume: z.number().int().positive().optional(),
+            qu_factor_purchase_to_stock: z.number().positive().optional(),
+            qu_factor_consume_to_stock: z.number().positive().optional(),
+            min_stock_amount: z.number().nonnegative().optional(),
+            default_best_before_days: z.number().int().nonnegative().optional(),
+            default_best_before_days_after_open: z.number().int().nonnegative().optional(),
+            default_best_before_days_after_freezing: z.number().int().nonnegative().optional(),
+            default_best_before_days_after_thawing: z.number().int().nonnegative().optional(),
+            picture_file_name: z.string().optional(),
+            allow_partial_units_in_stock: z.boolean().optional(),
+            enable_tare_weight_handling: z.boolean().optional(),
+            tare_weight: z.number().nonnegative().optional(),
+            not_check_stock_fulfillment_for_recipes: z.boolean().optional(),
+            parent_product_id: z.number().int().positive().optional(),
+            calories: z.number().nonnegative().optional(),
+            cumulate_min_stock_amount_of_sub_products: z.boolean().optional(),
+            due_type: z.enum(['expiration', 'best-before']).optional(),
+            quick_consume_amount: z.number().positive().optional(),
+            hide_on_stock_overview: z.boolean().optional()
+          });
+
+          // Stock entry schema
+          export const GrocyStockEntrySchema = GrocyBaseEntitySchema.extend({
+            product_id: z.number().int().positive(),
+            amount: z.number().nonnegative(),
+            best_before_date: z.string().date().optional(),
+            purchased_date: z.string().date().optional(),
+            stock_id: z.string().optional(),
+            price: z.number().nonnegative().optional(),
+            open: z.boolean().optional(),
+            opened_date: z.string().datetime().optional(),
+            location_id: z.number().int().positive().optional(),
+            shopping_location_id: z.number().int().positive().optional(),
+            note: z.string().optional()
+          });
+
+          // Shopping list item schema
+          export const GrocyShoppingListItemSchema = GrocyBaseEntitySchema.extend({
+            product_id: z.number().int().positive(),
+            note: z.string().optional(),
+            amount: z.number().positive(),
+            shopping_list_id: z.number().int().positive().optional(),
+            done: z.boolean().optional()
+          });
+
+          // Recipe schema
+          export const GrocyRecipeSchema = GrocyBaseEntitySchema.extend({
+            name: z.string().min(1).max(255),
+            description: z.string().optional(),
+            instructions: z.string().optional(),
+            picture_file_name: z.string().optional(),
+            base_servings: z.number().int().positive().optional(),
+            desired_servings: z.number().int().positive().optional(),
+            not_check_shoppinglist: z.boolean().optional(),
+            type: z.enum(['normal', 'mealplan']).optional()
+          });
+
+          // User schema
+          export const GrocyUserSchema = GrocyBaseEntitySchema.extend({
+            username: z.string().min(1).max(255),
+            first_name: z.string().optional(),
+            last_name: z.string().optional(),
+            password: z.string().min(1).optional(),
+            picture_file_name: z.string().optional(),
+            display_name: z.string().optional()
+          });
+
+          // API request/response schemas
+          export const GrocyApiResponseSchema = z.object({
+            data: z.unknown(),
+            error: z.string().optional(),
+            message: z.string().optional()
+          });
+
+          export const GrocyErrorResponseSchema = z.object({
+            error_message: z.string(),
+            error_details: z.unknown().optional()
+          });
+
+          // Type exports
+          export type GrocyProduct = z.infer<typeof GrocyProductSchema>;
+          export type GrocyStockEntry = z.infer<typeof GrocyStockEntrySchema>;
+          export type GrocyShoppingListItem = z.infer<typeof GrocyShoppingListItemSchema>;
+          export type GrocyRecipe = z.infer<typeof GrocyRecipeSchema>;
+          export type GrocyUser = z.infer<typeof GrocyUserSchema>;
+          export type GrocyApiResponse = z.infer<typeof GrocyApiResponseSchema>;
+          export type GrocyErrorResponse = z.infer<typeof GrocyErrorResponseSchema>;
+
+          // Schema registry for dynamic validation
+          export const GROCY_SCHEMAS = {
+            product: GrocyProductSchema,
+            stockEntry: GrocyStockEntrySchema,
+            shoppingListItem: GrocyShoppingListItemSchema,
+            recipe: GrocyRecipeSchema,
+            user: GrocyUserSchema,
+            apiResponse: GrocyApiResponseSchema,
+            errorResponse: GrocyErrorResponseSchema
+          } as const;
+          EOF
+
+          echo "✅ Grocy schemas created"
+
+      - name: Validate Schema Compilation
+        run: |
+          echo "🔧 Validating schema compilation..."
+
+          # Create schema validation script
+          cat > validate-schemas.mjs << 'EOF'
+          import fs from 'fs';
+          import path from 'path';
+
+          async function validateSchemas() {
+            const results = {
+              timestamp: new Date().toISOString(),
+              schemasFound: 0,
+              compilationErrors: [],
+              validationErrors: [],
+              typeExports: [],
+              summary: {
+                totalSchemas: 0,
+                validSchemas: 0,
+                errorCount: 0,
+                coveragePercentage: 0
               }
             };
             
-            // Test basic validation scenarios
-            const testCases = [
-              {
-                name: 'valid_product_passes',
-                data: sampleData.validProduct,
-                shouldPass: true
-              },
-              {
-                name: 'invalid_product_fails',
-                data: sampleData.invalidProduct,
-                shouldPass: false
-              },
-              {
-                name: 'valid_stock_entry_passes',
-                data: sampleData.validStockEntry,
-                shouldPass: true
-              },
-              {
-                name: 'invalid_stock_entry_fails',
-                data: sampleData.invalidStockEntry,
-                shouldPass: false
-              }
-            ];
+            console.log('Validating Zod schemas...');
             
-            testCases.forEach(testCase => {
-              runtimeResults.tests.push({
-                name: testCase.name,
-                passed: true, // Placeholder - would test actual schemas in real implementation
-                expected: testCase.shouldPass
-              });
-              runtimeResults.passed++;
-            });
+            // Check if schemas directory exists
+            const schemasDir = 'src/schemas';
+            if (!fs.existsSync(schemasDir)) {
+              console.log('No schemas directory found, creating sample structure...');
+              return results;
+            }
             
-          } catch (error) {
-            console.log('Runtime schema testing not available (schemas not compiled yet)');
-            runtimeResults.tests.push({
-              name: 'runtime_validation',
-              passed: false,
-              error: error.message
-            });
-            runtimeResults.failed++;
-          }
-          
-          return runtimeResults;
-        }
-        
-        // Run validation
-        Promise.all([
-          validateSchemas(),
-          validateRuntimeSchemas()
-        ]).then(([schemaResults, runtimeResults]) => {
-          const combinedResults = {
-            ...schemaResults,
-            runtimeTests: runtimeResults
-          };
-          
-          console.log('Schema Validation Results:');
-          console.log(`- Schemas found: ${schemaResults.schemasFound}`);
-          console.log(`- Valid schemas: ${schemaResults.summary.validSchemas}`);
-          console.log(`- Compilation errors: ${schemaResults.compilationErrors.length}`);
-          console.log(`- Validation errors: ${schemaResults.validationErrors.length}`);
-          console.log(`- Coverage: ${schemaResults.summary.coveragePercentage}%`);
-          console.log(`- Runtime tests passed: ${runtimeResults.passed}`);
-          console.log(`- Runtime tests failed: ${runtimeResults.failed}`);
-          
-          fs.writeFileSync('schema-validation-results.json', JSON.stringify(combinedResults, null, 2));
-          
-          // Exit with error if critical issues found
-          if (schemaResults.compilationErrors.length > 0) {
-            console.error('Schema compilation errors detected!');
-            process.exit(1);
-          }
-        }).catch(error => {
-          console.error('Schema validation failed:', error);
-          process.exit(1);
-        });
-        EOF
-        
-        node validate-schemas.mjs
-
-    - name: Test Schema Coverage
-      run: |
-        echo "📊 Testing schema coverage against Grocy API..."
-        
-        # Create coverage analysis script
-        cat > analyze-coverage.mjs << 'EOF'
-        import fs from 'fs';
-        
-        function analyzeGrocySchemaCoverage() {
-          // Expected Grocy API entities based on specification
-          const expectedEntities = [
-            'products',
-            'stock',
-            'shopping_list',
-            'recipes',
-            'recipe_ingredients', 
-            'users',
-            'locations',
-            'quantity_units',
-            'product_groups',
-            'chores',
-            'batteries',
-            'tasks',
-            'userfields',
-            'meal_plan'
-          ];
-          
-          let results;
-          try {
-            results = JSON.parse(fs.readFileSync('schema-validation-results.json', 'utf8'));
-          } catch (e) {
-            console.log('No schema validation results found');
-            return { coverage: 0, missing: expectedEntities };
-          }
-          
-          // Extract covered entities from schema names
-          const coveredEntities = results.typeExports
-            .filter(name => name.includes('Schema'))
-            .map(name => name.replace('Schema', '').toLowerCase())
-            .map(name => {
-              // Map schema names to API entities
-              if (name.includes('product')) return 'products';
-              if (name.includes('stock')) return 'stock';
-              if (name.includes('shopping')) return 'shopping_list';
-              if (name.includes('recipe')) return 'recipes';
-              if (name.includes('user')) return 'users';
-              return name;
-            })
-            .filter(name => expectedEntities.includes(name));
-          
-          const uniqueCovered = [...new Set(coveredEntities)];
-          const missing = expectedEntities.filter(entity => !uniqueCovered.includes(entity));
-          
-          const coverage = {
-            total: expectedEntities.length,
-            covered: uniqueCovered.length,
-            missing: missing.length,
-            percentage: Math.round((uniqueCovered.length / expectedEntities.length) * 100),
-            coveredEntities: uniqueCovered,
-            missingEntities: missing
-          };
-          
-          console.log('Grocy API Schema Coverage:');
-          console.log(`- Total entities: ${coverage.total}`);
-          console.log(`- Covered: ${coverage.covered}`);
-          console.log(`- Missing: ${coverage.missing}`);
-          console.log(`- Coverage: ${coverage.percentage}%`);
-          
-          if (coverage.missingEntities.length > 0) {
-            console.log('Missing schemas for:', coverage.missingEntities.join(', '));
-          }
-          
-          fs.writeFileSync('schema-coverage.json', JSON.stringify(coverage, null, 2));
-          return coverage;
-        }
-        
-        analyzeGrocySchemaCoverage();
-        EOF
-        
-        node analyze-coverage.mjs
-
-    - name: Generate Schema Documentation
-      run: |
-        echo "📋 Generating schema documentation..."
-        
-        cat > schema-report.md << 'EOF'
-        # Schema Validation Report
-        
-        Generated on: $(date)
-        PR: #${{ github.event.pull_request.number }}
-        
-        ## Schema Validation Summary
-        
-        EOF
-        
-        # Add validation results using jq
-        echo "| Metric | Value |" >> schema-report.md
-        echo "|--------|-------|" >> schema-report.md
-        echo "| **Schema Files** | $(jq '.schemasFound // 0' schema-validation-results.json 2>/dev/null || echo 0) |" >> schema-report.md
-        echo "| **Valid Schemas** | $(jq '.summary.validSchemas // 0' schema-validation-results.json 2>/dev/null || echo 0) |" >> schema-report.md
-        echo "| **Compilation Errors** | $(jq '.compilationErrors | length // 0' schema-validation-results.json 2>/dev/null || echo 0) |" >> schema-report.md
-        echo "| **Validation Errors** | $(jq '.validationErrors | length // 0' schema-validation-results.json 2>/dev/null || echo 0) |" >> schema-report.md
-        echo "| **API Coverage** | $(jq '.percentage // 0' schema-coverage.json 2>/dev/null || echo 0)% |" >> schema-report.md
-        PASSED_TESTS=$(jq '.runtimeTests.passed // 0' schema-validation-results.json 2>/dev/null || echo 0)
-        FAILED_TESTS=$(jq '.runtimeTests.failed // 0' schema-validation-results.json 2>/dev/null || echo 0)
-        echo "| **Runtime Tests** | $PASSED_TESTS passed, $FAILED_TESTS failed |" >> schema-report.md
-        
-        echo "" >> schema-report.md
-        echo "## Grocy API Coverage" >> schema-report.md
-        echo "" >> schema-report.md
-        
-        # Add coverage details
-        COVERAGE_PERCENTAGE=$(jq -r '.percentage // 0' schema-coverage.json 2>/dev/null || echo 0)
-        
-        if [ "$COVERAGE_PERCENTAGE" -lt 80 ]; then
-          echo "⚠️ **Schema coverage is below 80%**" >> schema-report.md
-          echo "" >> schema-report.md
-          echo "Missing schemas for the following Grocy API entities:" >> schema-report.md
-          echo "" >> schema-report.md
-          jq -r '.missingEntities[]? | "- " + .' schema-coverage.json 2>/dev/null >> schema-report.md || true
-        else
-          echo "✅ **Schema coverage is adequate** (≥80%)" >> schema-report.md
-        fi
-        
-        echo "" >> schema-report.md
-        echo "## Validation Issues" >> schema-report.md
-        echo "" >> schema-report.md
-        
-        # Add compilation errors if any
-        COMPILATION_ERRORS=$(jq '.compilationErrors | length // 0' schema-validation-results.json 2>/dev/null || echo 0)
-        
-        if [ "$COMPILATION_ERRORS" -gt 0 ]; then
-          echo "### ❌ Compilation Errors" >> schema-report.md
-          echo "" >> schema-report.md
-          jq -r '.compilationErrors[]? | "- **" + .file + "**: " + .error' schema-validation-results.json 2>/dev/null >> schema-report.md || true
-          echo "" >> schema-report.md
-        fi
-        
-        echo "## Recommendations" >> schema-report.md
-        echo "" >> schema-report.md
-        echo "1. **Complete API Coverage**: Add schemas for all Grocy API entities" >> schema-report.md
-        echo "2. **Runtime Validation**: Implement comprehensive runtime testing" >> schema-report.md
-        echo "3. **Error Handling**: Add specific error schemas for different failure modes" >> schema-report.md
-        echo "4. **Documentation**: Add JSDoc comments to all schema definitions" >> schema-report.md
-        echo "5. **Validation Helpers**: Create utility functions for common validation patterns" >> schema-report.md
-
-    - name: Check Schema Quality Gates
-      run: |
-        echo "🎯 Checking schema quality gates..."
-        
-        # Read validation results
-        COMPILATION_ERRORS=$(jq '.compilationErrors | length // 0' schema-validation-results.json 2>/dev/null || echo 0)
-        
-        VALIDATION_ERRORS=$(jq '.validationErrors | length // 0' schema-validation-results.json 2>/dev/null || echo 0)
-        
-        COVERAGE_PERCENTAGE=$(jq '.percentage // 0' schema-coverage.json 2>/dev/null || echo 0)
-        
-        # Quality gates
-        QUALITY_ISSUES=0
-        
-        if [ "$COMPILATION_ERRORS" -gt 0 ]; then
-          echo "❌ Schema compilation errors: $COMPILATION_ERRORS"
-          QUALITY_ISSUES=$((QUALITY_ISSUES + 1))
-        fi
-        
-        if [ "$VALIDATION_ERRORS" -gt 3 ]; then
-          echo "⚠️ High number of validation errors: $VALIDATION_ERRORS"
-          QUALITY_ISSUES=$((QUALITY_ISSUES + 1))
-        fi
-        
-        if [ "$COVERAGE_PERCENTAGE" -lt 50 ]; then
-          echo "⚠️ Low API coverage: $COVERAGE_PERCENTAGE%"
-        fi
-        
-        if [ "$QUALITY_ISSUES" -gt 0 ]; then
-          echo ""
-          echo "Schema quality gates failed. Address the issues above."
-          echo "Note: This is informational for v1.0.0 development and won't fail the build."
-        else
-          echo "✅ All schema quality gates passed!"
-        fi
-
-    - name: Upload Schema Reports
-      uses: actions/upload-artifact@v4
-      with:
-        name: schema-reports
-        path: |
-          schema-report.md
-          schema-validation-results.json
-          schema-coverage.json
-          src/schemas/
-        retention-days: 30
-
-    - name: Comment on PR
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const fs = require('fs');
-          
-          let comment = `## 🔍 Schema Validation Report\n\n`;
-          
-          let results = {}, coverage = {};
-          try {
-            results = JSON.parse(fs.readFileSync('schema-validation-results.json', 'utf8'));
-          } catch (e) {}
-          try {
-            coverage = JSON.parse(fs.readFileSync('schema-coverage.json', 'utf8'));
-          } catch (e) {}
-          
-          comment += `| Metric | Value |\n`;
-          comment += `|--------|-------|\n`;
-          comment += `| Schema Files | ${results.schemasFound || 0} |\n`;
-          comment += `| Valid Schemas | ${results.summary?.validSchemas || 0} |\n`;
-          comment += `| Compilation Errors | ${results.compilationErrors?.length || 0} |\n`;
-          comment += `| API Coverage | ${coverage.percentage || 0}% |\n\n`;
-          
-          if ((results.compilationErrors?.length || 0) > 0) {
-            comment += `### ❌ Schema Issues\n`;
-            comment += `Found ${results.compilationErrors.length} compilation errors that need attention.\n\n`;
-          }
-          
-          if ((coverage.percentage || 0) < 80) {
-            comment += `### ⚠️ Coverage Notice\n`;
-            comment += `API schema coverage is ${coverage.percentage || 0}%. Consider adding schemas for:\n`;
-            if (coverage.missingEntities) {
-              coverage.missingEntities.slice(0, 5).forEach(entity => {
-                comment += `- ${entity}\n`;
-              });
-              if (coverage.missingEntities.length > 5) {
-                comment += `- ...and ${coverage.missingEntities.length - 5} more\n`;
+            // Find all schema files
+            const schemaFiles = fs.readdirSync(schemasDir, { recursive: true })
+              .filter(file => typeof file === 'string' && (file.endsWith('.ts') || file.endsWith('.js')))
+              .map(file => path.join(schemasDir, file));
+            
+            results.schemasFound = schemaFiles.length;
+            console.log(`Found ${schemaFiles.length} schema files`);
+            
+            // Validate each schema file
+            for (const schemaFile of schemaFiles) {
+              try {
+                console.log(`Validating ${schemaFile}...`);
+                
+                const content = fs.readFileSync(schemaFile, 'utf8');
+                
+                // Check for Zod imports
+                if (!content.includes('import') || !content.includes('zod')) {
+                  results.validationErrors.push({
+                    file: schemaFile,
+                    type: 'missing_zod_import',
+                    message: 'File should import Zod library'
+                  });
+                }
+                
+                // Extract schema definitions
+                const schemaMatches = content.match(/export\s+const\s+(\w+Schema)\s*=/g);
+                if (schemaMatches) {
+                  schemaMatches.forEach(match => {
+                    const schemaName = match.match(/(\w+Schema)/)[1];
+                    results.typeExports.push(schemaName);
+                  });
+                }
+                
+                // Check for type exports
+                const typeMatches = content.match(/export\s+type\s+(\w+)/g);
+                if (typeMatches) {
+                  typeMatches.forEach(match => {
+                    const typeName = match.match(/type\s+(\w+)/)[1];
+                    results.typeExports.push(typeName);
+                  });
+                }
+                
+                // Validate schema structure (basic check)
+                if (content.includes('z.object') || content.includes('z.string') || content.includes('z.number')) {
+                  results.summary.validSchemas++;
+                } else {
+                  results.validationErrors.push({
+                    file: schemaFile,
+                    type: 'invalid_schema_structure',
+                    message: 'File does not contain valid Zod schema definitions'
+                  });
+                }
+                
+              } catch (error) {
+                results.compilationErrors.push({
+                  file: schemaFile,
+                  error: error.message
+                });
+                results.summary.errorCount++;
               }
             }
-            comment += `\n`;
+            
+            results.summary.totalSchemas = schemaFiles.length;
+            results.summary.coveragePercentage = schemaFiles.length > 0 
+              ? Math.round((results.summary.validSchemas / schemaFiles.length) * 100)
+              : 0;
+            
+            return results;
           }
-          
-          comment += `📊 [View detailed schema report](${context.payload.pull_request.html_url}/checks)\n\n`;
-          comment += `---\n`;
-          comment += `*This comment was automatically generated by the Schema Validation workflow*`;
-          
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: comment
-          });
 
-    - name: Cache Schema Data
-      uses: actions/cache@v4
-      with:
-        path: |
-          src/schemas/
-          schema-validation-results.json
-          schema-coverage.json
-        key: schemas-${{ runner.os }}-${{ github.sha }}
-        restore-keys: |
-          schemas-${{ runner.os }}-
+          // Validate runtime schema functionality
+          async function validateRuntimeSchemas() {
+            console.log('Testing runtime schema validation...');
+            
+            const runtimeResults = {
+              tests: [],
+              passed: 0,
+              failed: 0
+            };
+            
+            try {
+              // Try to import and test schemas
+              const sampleData = {
+                validProduct: {
+                  id: 1,
+                  name: 'Test Product',
+                  qu_id_stock: 1
+                },
+                invalidProduct: {
+                  id: -1, // Invalid: negative ID
+                  name: '', // Invalid: empty name
+                  qu_id_stock: 'invalid' // Invalid: string instead of number
+                },
+                validStockEntry: {
+                  id: 1,
+                  product_id: 1,
+                  amount: 5.5
+                },
+                invalidStockEntry: {
+                  id: 1,
+                  product_id: 1,
+                  amount: -1 // Invalid: negative amount
+                }
+              };
+              
+              // Test basic validation scenarios
+              const testCases = [
+                {
+                  name: 'valid_product_passes',
+                  data: sampleData.validProduct,
+                  shouldPass: true
+                },
+                {
+                  name: 'invalid_product_fails',
+                  data: sampleData.invalidProduct,
+                  shouldPass: false
+                },
+                {
+                  name: 'valid_stock_entry_passes',
+                  data: sampleData.validStockEntry,
+                  shouldPass: true
+                },
+                {
+                  name: 'invalid_stock_entry_fails',
+                  data: sampleData.invalidStockEntry,
+                  shouldPass: false
+                }
+              ];
+              
+              testCases.forEach(testCase => {
+                runtimeResults.tests.push({
+                  name: testCase.name,
+                  passed: true, // Placeholder - would test actual schemas in real implementation
+                  expected: testCase.shouldPass
+                });
+                runtimeResults.passed++;
+              });
+              
+            } catch (error) {
+              console.log('Runtime schema testing not available (schemas not compiled yet)');
+              runtimeResults.tests.push({
+                name: 'runtime_validation',
+                passed: false,
+                error: error.message
+              });
+              runtimeResults.failed++;
+            }
+            
+            return runtimeResults;
+          }
+
+          // Run validation
+          Promise.all([
+            validateSchemas(),
+            validateRuntimeSchemas()
+          ]).then(([schemaResults, runtimeResults]) => {
+            const combinedResults = {
+              ...schemaResults,
+              runtimeTests: runtimeResults
+            };
+            
+            console.log('Schema Validation Results:');
+            console.log(`- Schemas found: ${schemaResults.schemasFound}`);
+            console.log(`- Valid schemas: ${schemaResults.summary.validSchemas}`);
+            console.log(`- Compilation errors: ${schemaResults.compilationErrors.length}`);
+            console.log(`- Validation errors: ${schemaResults.validationErrors.length}`);
+            console.log(`- Coverage: ${schemaResults.summary.coveragePercentage}%`);
+            console.log(`- Runtime tests passed: ${runtimeResults.passed}`);
+            console.log(`- Runtime tests failed: ${runtimeResults.failed}`);
+            
+            fs.writeFileSync('schema-validation-results.json', JSON.stringify(combinedResults, null, 2));
+            
+            // Exit with error if critical issues found
+            if (schemaResults.compilationErrors.length > 0) {
+              console.error('Schema compilation errors detected!');
+              process.exit(1);
+            }
+          }).catch(error => {
+            console.error('Schema validation failed:', error);
+            process.exit(1);
+          });
+          EOF
+
+          node validate-schemas.mjs
+
+      - name: Test Schema Coverage
+        run: |
+          echo "📊 Testing schema coverage against Grocy API..."
+
+          # Create coverage analysis script
+          cat > analyze-coverage.mjs << 'EOF'
+          import fs from 'fs';
+
+          function analyzeGrocySchemaCoverage() {
+            // Expected Grocy API entities based on specification
+            const expectedEntities = [
+              'products',
+              'stock',
+              'shopping_list',
+              'recipes',
+              'recipe_ingredients', 
+              'users',
+              'locations',
+              'quantity_units',
+              'product_groups',
+              'chores',
+              'batteries',
+              'tasks',
+              'userfields',
+              'meal_plan'
+            ];
+            
+            let results;
+            try {
+              results = JSON.parse(fs.readFileSync('schema-validation-results.json', 'utf8'));
+            } catch (e) {
+              console.log('No schema validation results found');
+              return { coverage: 0, missing: expectedEntities };
+            }
+            
+            // Extract covered entities from schema names
+            const coveredEntities = results.typeExports
+              .filter(name => name.includes('Schema'))
+              .map(name => name.replace('Schema', '').toLowerCase())
+              .map(name => {
+                // Map schema names to API entities
+                if (name.includes('product')) return 'products';
+                if (name.includes('stock')) return 'stock';
+                if (name.includes('shopping')) return 'shopping_list';
+                if (name.includes('recipe')) return 'recipes';
+                if (name.includes('user')) return 'users';
+                return name;
+              })
+              .filter(name => expectedEntities.includes(name));
+            
+            const uniqueCovered = [...new Set(coveredEntities)];
+            const missing = expectedEntities.filter(entity => !uniqueCovered.includes(entity));
+            
+            const coverage = {
+              total: expectedEntities.length,
+              covered: uniqueCovered.length,
+              missing: missing.length,
+              percentage: Math.round((uniqueCovered.length / expectedEntities.length) * 100),
+              coveredEntities: uniqueCovered,
+              missingEntities: missing
+            };
+            
+            console.log('Grocy API Schema Coverage:');
+            console.log(`- Total entities: ${coverage.total}`);
+            console.log(`- Covered: ${coverage.covered}`);
+            console.log(`- Missing: ${coverage.missing}`);
+            console.log(`- Coverage: ${coverage.percentage}%`);
+            
+            if (coverage.missingEntities.length > 0) {
+              console.log('Missing schemas for:', coverage.missingEntities.join(', '));
+            }
+            
+            fs.writeFileSync('schema-coverage.json', JSON.stringify(coverage, null, 2));
+            return coverage;
+          }
+
+          analyzeGrocySchemaCoverage();
+          EOF
+
+          node analyze-coverage.mjs
+
+      - name: Generate Schema Documentation
+        run: |
+          echo "📋 Generating schema documentation..."
+
+          cat > schema-report.md << 'EOF'
+          # Schema Validation Report
+
+          Generated on: $(date)
+          PR: #${{ github.event.pull_request.number }}
+
+          ## Schema Validation Summary
+
+          EOF
+
+          # Add validation results using jq
+          echo "| Metric | Value |" >> schema-report.md
+          echo "|--------|-------|" >> schema-report.md
+          echo "| **Schema Files** | $(jq '.schemasFound // 0' schema-validation-results.json 2>/dev/null || echo 0) |" >> schema-report.md
+          echo "| **Valid Schemas** | $(jq '.summary.validSchemas // 0' schema-validation-results.json 2>/dev/null || echo 0) |" >> schema-report.md
+          echo "| **Compilation Errors** | $(jq '.compilationErrors | length // 0' schema-validation-results.json 2>/dev/null || echo 0) |" >> schema-report.md
+          echo "| **Validation Errors** | $(jq '.validationErrors | length // 0' schema-validation-results.json 2>/dev/null || echo 0) |" >> schema-report.md
+          echo "| **API Coverage** | $(jq '.percentage // 0' schema-coverage.json 2>/dev/null || echo 0)% |" >> schema-report.md
+          PASSED_TESTS=$(jq '.runtimeTests.passed // 0' schema-validation-results.json 2>/dev/null || echo 0)
+          FAILED_TESTS=$(jq '.runtimeTests.failed // 0' schema-validation-results.json 2>/dev/null || echo 0)
+          echo "| **Runtime Tests** | $PASSED_TESTS passed, $FAILED_TESTS failed |" >> schema-report.md
+
+          echo "" >> schema-report.md
+          echo "## Grocy API Coverage" >> schema-report.md
+          echo "" >> schema-report.md
+
+          # Add coverage details
+          COVERAGE_PERCENTAGE=$(jq -r '.percentage // 0' schema-coverage.json 2>/dev/null || echo 0)
+
+          if [ "$COVERAGE_PERCENTAGE" -lt 80 ]; then
+            echo "⚠️ **Schema coverage is below 80%**" >> schema-report.md
+            echo "" >> schema-report.md
+            echo "Missing schemas for the following Grocy API entities:" >> schema-report.md
+            echo "" >> schema-report.md
+            jq -r '.missingEntities[]? | "- " + .' schema-coverage.json 2>/dev/null >> schema-report.md || true
+          else
+            echo "✅ **Schema coverage is adequate** (≥80%)" >> schema-report.md
+          fi
+
+          echo "" >> schema-report.md
+          echo "## Validation Issues" >> schema-report.md
+          echo "" >> schema-report.md
+
+          # Add compilation errors if any
+          COMPILATION_ERRORS=$(jq '.compilationErrors | length // 0' schema-validation-results.json 2>/dev/null || echo 0)
+
+          if [ "$COMPILATION_ERRORS" -gt 0 ]; then
+            echo "### ❌ Compilation Errors" >> schema-report.md
+            echo "" >> schema-report.md
+            jq -r '.compilationErrors[]? | "- **" + .file + "**: " + .error' schema-validation-results.json 2>/dev/null >> schema-report.md || true
+            echo "" >> schema-report.md
+          fi
+
+          echo "## Recommendations" >> schema-report.md
+          echo "" >> schema-report.md
+          echo "1. **Complete API Coverage**: Add schemas for all Grocy API entities" >> schema-report.md
+          echo "2. **Runtime Validation**: Implement comprehensive runtime testing" >> schema-report.md
+          echo "3. **Error Handling**: Add specific error schemas for different failure modes" >> schema-report.md
+          echo "4. **Documentation**: Add JSDoc comments to all schema definitions" >> schema-report.md
+          echo "5. **Validation Helpers**: Create utility functions for common validation patterns" >> schema-report.md
+
+      - name: Check Schema Quality Gates
+        run: |
+          echo "🎯 Checking schema quality gates..."
+
+          # Read validation results
+          COMPILATION_ERRORS=$(jq '.compilationErrors | length // 0' schema-validation-results.json 2>/dev/null || echo 0)
+
+          VALIDATION_ERRORS=$(jq '.validationErrors | length // 0' schema-validation-results.json 2>/dev/null || echo 0)
+
+          COVERAGE_PERCENTAGE=$(jq '.percentage // 0' schema-coverage.json 2>/dev/null || echo 0)
+
+          # Quality gates
+          QUALITY_ISSUES=0
+
+          if [ "$COMPILATION_ERRORS" -gt 0 ]; then
+            echo "❌ Schema compilation errors: $COMPILATION_ERRORS"
+            QUALITY_ISSUES=$((QUALITY_ISSUES + 1))
+          fi
+
+          if [ "$VALIDATION_ERRORS" -gt 3 ]; then
+            echo "⚠️ High number of validation errors: $VALIDATION_ERRORS"
+            QUALITY_ISSUES=$((QUALITY_ISSUES + 1))
+          fi
+
+          if [ "$COVERAGE_PERCENTAGE" -lt 50 ]; then
+            echo "⚠️ Low API coverage: $COVERAGE_PERCENTAGE%"
+          fi
+
+          if [ "$QUALITY_ISSUES" -gt 0 ]; then
+            echo ""
+            echo "Schema quality gates failed. Address the issues above."
+            echo "Note: This is informational for v1.0.0 development and won't fail the build."
+          else
+            echo "✅ All schema quality gates passed!"
+          fi
+
+      - name: Upload Schema Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: schema-reports
+          path: |
+            schema-report.md
+            schema-validation-results.json
+            schema-coverage.json
+            src/schemas/
+          retention-days: 30
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            let comment = `## 🔍 Schema Validation Report\n\n`;
+
+            let results = {}, coverage = {};
+            try {
+              results = JSON.parse(fs.readFileSync('schema-validation-results.json', 'utf8'));
+            } catch (e) {}
+            try {
+              coverage = JSON.parse(fs.readFileSync('schema-coverage.json', 'utf8'));
+            } catch (e) {}
+
+            comment += `| Metric | Value |\n`;
+            comment += `|--------|-------|\n`;
+            comment += `| Schema Files | ${results.schemasFound || 0} |\n`;
+            comment += `| Valid Schemas | ${results.summary?.validSchemas || 0} |\n`;
+            comment += `| Compilation Errors | ${results.compilationErrors?.length || 0} |\n`;
+            comment += `| API Coverage | ${coverage.percentage || 0}% |\n\n`;
+
+            if ((results.compilationErrors?.length || 0) > 0) {
+              comment += `### ❌ Schema Issues\n`;
+              comment += `Found ${results.compilationErrors.length} compilation errors that need attention.\n\n`;
+            }
+
+            if ((coverage.percentage || 0) < 80) {
+              comment += `### ⚠️ Coverage Notice\n`;
+              comment += `API schema coverage is ${coverage.percentage || 0}%. Consider adding schemas for:\n`;
+              if (coverage.missingEntities) {
+                coverage.missingEntities.slice(0, 5).forEach(entity => {
+                  comment += `- ${entity}\n`;
+                });
+                if (coverage.missingEntities.length > 5) {
+                  comment += `- ...and ${coverage.missingEntities.length - 5} more\n`;
+                }
+              }
+              comment += `\n`;
+            }
+
+            comment += `📊 [View detailed schema report](${context.payload.pull_request.html_url}/checks)\n\n`;
+            comment += `---\n`;
+            comment += `*This comment was automatically generated by the Schema Validation workflow*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Cache Schema Data
+        uses: actions/cache@v4
+        with:
+          path: |
+            src/schemas/
+            schema-validation-results.json
+            schema-coverage.json
+          key: schemas-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            schemas-${{ runner.os }}-
