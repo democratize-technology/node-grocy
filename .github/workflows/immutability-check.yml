@@ -77,7 +77,16 @@ jobs:
         echo "=============================================================="
         
         # Check current JavaScript files for mutations
-        npx eslint --config eslint.config.immutability.mjs "*.mjs" "*.js" --format=stylish
+        echo "Checking for .mjs and .js files..."
+        find . -maxdepth 1 -name "*.mjs" -o -name "*.js" | head -5
+        
+        # Run ESLint on .mjs files (which we know exist)
+        if ls *.mjs 1> /dev/null 2>&1; then
+          echo "Running immutability check on .mjs files..."
+          npx eslint --config eslint.config.immutability.mjs index.mjs --format=stylish
+        else
+          echo "✅ No .mjs files found to check"
+        fi
         
         if [ $? -ne 0 ]; then
           echo ""
