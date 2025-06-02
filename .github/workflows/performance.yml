@@ -504,7 +504,7 @@ jobs:
       uses: actions/github-script@v7
       with:
         script: |
-          import fs from 'fs';
+          const fs = require('fs');
           
           let comment = `## ⚡ Performance Benchmark Report\n\n`;
           

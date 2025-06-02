@@ -329,7 +329,7 @@ jobs:
       uses: actions/github-script@v7
       with:
         script: |
-          import fs from 'fs';
+          const fs = require('fs');
           
           const data = JSON.parse(fs.readFileSync('api-comparison.json', 'utf8'));
           const breaking = '${{ env.BREAKING_CHANGES }}' === 'true';
