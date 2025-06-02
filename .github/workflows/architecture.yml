@@ -41,9 +41,9 @@ jobs:
         echo "🏗️ Analyzing service architecture for node-grocy v1.0.0..."
         
         # Create architecture analysis script
-        cat > analyze-architecture.js << 'EOF'
-        const fs = require('fs');
-        const path = require('path');
+        cat > analyze-architecture.mjs << 'EOF'
+        import fs from 'fs';
+        import path from 'path';
         
         function findServiceFiles() {
           const serviceFiles = [];
@@ -175,15 +175,15 @@ jobs:
         }
         EOF
         
-        node analyze-architecture.js
+        node analyze-architecture.mjs
 
     - name: Check Dependency Injection Patterns
       run: |
         set -euo pipefail
         echo "💉 Checking dependency injection patterns..."
         
-        cat > check-di.js << 'EOF'
-        const fs = require('fs');
+        cat > check-di.mjs << 'EOF'
+        import fs from 'fs';
         
         function analyzeDI() {
           const results = {
@@ -279,7 +279,7 @@ jobs:
         }
         EOF
         
-        node check-di.js
+        node check-di.mjs
 
     - name: Detect Circular Dependencies
       run: |
@@ -313,8 +313,8 @@ jobs:
         set -euo pipefail
         echo "🏭 Validating service boundaries..."
         
-        cat > validate-boundaries.js << 'EOF'
-        const fs = require('fs');
+        cat > validate-boundaries.mjs << 'EOF'
+        import fs from 'fs';
         
         function validateBoundaries() {
           let analysis;
@@ -391,7 +391,7 @@ jobs:
         }
         EOF
         
-        node validate-boundaries.js
+        node validate-boundaries.mjs
 
     - name: Generate Architecture Report
       run: |
@@ -407,38 +407,50 @@ jobs:
         
         EOF
         
-        # Add analysis results
-        node -pe "
-        let archAnalysis, diAnalysis, boundaryValidation;
+        # Add analysis results using jq
+        echo "| Metric | Status |" >> architecture-report.md
+        echo "|--------|--------|" >> architecture-report.md
         
-        try { archAnalysis = JSON.parse(require('fs').readFileSync('architecture-analysis.json', 'utf8')); } catch(e) { archAnalysis = {}; }
-        try { diAnalysis = JSON.parse(require('fs').readFileSync('di-analysis.json', 'utf8')); } catch(e) { diAnalysis = {}; }
-        try { boundaryValidation = JSON.parse(require('fs').readFileSync('boundary-validation.json', 'utf8')); } catch(e) { boundaryValidation = {}; }
+        # Architecture type
+        IS_MONOLITHIC=$(jq -r '.isMonolithic // true' architecture-analysis.json 2>/dev/null)
+        if [ "$IS_MONOLITHIC" = "true" ]; then
+          echo "| **Architecture Type** | 🏗️ Monolithic |" >> architecture-report.md
+        else
+          echo "| **Architecture Type** | 🏭 Modular |" >> architecture-report.md
+        fi
         
-        let summary = \`| Metric | Status |\n|--------|--------|\n\`;
-        summary += \`| **Architecture Type** | \${archAnalysis.isMonolithic ? '🏗️ Monolithic' : '🏭 Modular'} |\n\`;
-        summary += \`| **Services Found** | \${archAnalysis.servicesFound || 0} |\n\`;
-        summary += \`| **Files Analyzed** | \${archAnalysis.filesAnalyzed || 0} |\n\`;
-        summary += \`| **Circular Dependencies** | \${process.env.CIRCULAR_COUNT || 0} |\n\`;
-        summary += \`| **DI Pattern** | \${diAnalysis.hasConstructorInjection ? '✅ Implemented' : '❌ Missing'} |\n\`;
-        summary += \`| **Service Interfaces** | \${diAnalysis.hasServiceInterfaces ? '✅ Present' : '❌ Missing'} |\n\`;
-        summary += \`| **Boundary Violations** | \${(boundaryValidation.summary?.errors || 0) + (boundaryValidation.summary?.warnings || 0)} |\n\`;
+        echo "| **Services Found** | $(jq '.servicesFound // 0' architecture-analysis.json 2>/dev/null || echo 0) |" >> architecture-report.md
+        echo "| **Files Analyzed** | $(jq '.filesAnalyzed // 0' architecture-analysis.json 2>/dev/null || echo 0) |" >> architecture-report.md
+        echo "| **Circular Dependencies** | ${{ env.CIRCULAR_COUNT }} |" >> architecture-report.md
         
-        console.log(summary);
-        " >> architecture-report.md
+        # DI Pattern
+        HAS_DI=$(jq -r '.hasConstructorInjection // false' di-analysis.json 2>/dev/null)
+        if [ "$HAS_DI" = "true" ]; then
+          echo "| **DI Pattern** | ✅ Implemented |" >> architecture-report.md
+        else
+          echo "| **DI Pattern** | ❌ Missing |" >> architecture-report.md
+        fi
+        
+        # Service Interfaces
+        HAS_INTERFACES=$(jq -r '.hasServiceInterfaces // false' di-analysis.json 2>/dev/null)
+        if [ "$HAS_INTERFACES" = "true" ]; then
+          echo "| **Service Interfaces** | ✅ Present |" >> architecture-report.md
+        else
+          echo "| **Service Interfaces** | ❌ Missing |" >> architecture-report.md
+        fi
+        
+        # Boundary Violations
+        ERRORS=$(jq '.summary.errors // 0' boundary-validation.json 2>/dev/null || echo 0)
+        WARNINGS=$(jq '.summary.warnings // 0' boundary-validation.json 2>/dev/null || echo 0)
+        TOTAL_VIOLATIONS=$((ERRORS + WARNINGS))
+        echo "| **Boundary Violations** | $TOTAL_VIOLATIONS |" >> architecture-report.md
         
         echo "" >> architecture-report.md
         echo "## Detailed Analysis" >> architecture-report.md
         echo "" >> architecture-report.md
         
         # Add monolithic guidance if applicable
-        IS_MONOLITHIC=$(node -pe "
-        try { 
-          const analysis = JSON.parse(require('fs').readFileSync('architecture-analysis.json', 'utf8')); 
-          console.log(analysis.isMonolithic); 
-        } catch(e) { 
-          console.log('true'); 
-        }")
+        IS_MONOLITHIC=$(jq -r '.isMonolithic // true' architecture-analysis.json 2>/dev/null)
         
         if [ "$IS_MONOLITHIC" = "true" ]; then
           echo "### 🏗️ Monolithic Structure Detected" >> architecture-report.md
@@ -457,13 +469,7 @@ jobs:
         echo "### 💉 Dependency Injection Recommendations" >> architecture-report.md
         echo "" >> architecture-report.md
         
-        HAS_DI=$(node -pe "
-        try { 
-          const di = JSON.parse(require('fs').readFileSync('di-analysis.json', 'utf8')); 
-          console.log(di.hasConstructorInjection); 
-        } catch(e) { 
-          console.log('false'); 
-        }")
+        HAS_DI=$(jq -r '.hasConstructorInjection // false' di-analysis.json 2>/dev/null)
         
         if [ "$HAS_DI" = "false" ]; then
           echo "⚠️ **No dependency injection detected.** For v1.0.0:" >> architecture-report.md
@@ -495,13 +501,7 @@ jobs:
       run: |
         set -euo pipefail
         # Fail if there are critical architecture violations
-        ERRORS=$(node -pe "
-        try {
-          const validation = JSON.parse(require('fs').readFileSync('boundary-validation.json', 'utf8'));
-          console.log(validation.summary.errors || 0);
-        } catch(e) {
-          console.log('0');
-        }")
+        ERRORS=$(jq '.summary.errors // 0' boundary-validation.json 2>/dev/null || echo 0)
         
         CIRCULAR_DEPS="${{ env.CIRCULAR_DEPENDENCIES }}"
         
@@ -537,7 +537,7 @@ jobs:
       uses: actions/github-script@v7
       with:
         script: |
-          const fs = require('fs');
+          import fs from 'fs';
           
           let comment = `## 🏗️ Architecture Validation\n\n`;
           

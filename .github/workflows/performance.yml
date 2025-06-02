@@ -42,9 +42,9 @@ jobs:
         echo "⚡ Setting up performance benchmark environment..."
         
         # Create mock Grocy server for testing
-        cat > mock-grocy-server.js << 'EOF'
-        const http = require('http');
-        const url = require('url');
+        cat > mock-grocy-server.mjs << 'EOF'
+        import http from 'http';
+        import url from 'url';
         
         const mockResponses = {
           '/api/stock': { data: Array.from({length: 100}, (_, i) => ({
@@ -107,7 +107,7 @@ jobs:
 
     - name: Start Mock Server
       run: |
-        node mock-grocy-server.js &
+        node mock-grocy-server.mjs &
         MOCK_SERVER_PID=$!
         echo "MOCK_SERVER_PID=$MOCK_SERVER_PID" >> $GITHUB_ENV
         
@@ -129,8 +129,8 @@ jobs:
         echo "📊 Running baseline performance benchmarks..."
         
         # Create performance test script
-        cat > performance-test.js << 'EOF'
-        const { performance } = require('perf_hooks');
+        cat > performance-test.mjs << 'EOF'
+        import { performance } from 'perf_hooks';
         
         // Import the node-grocy client
         let GrocyClient;
@@ -313,15 +313,15 @@ jobs:
         EOF
         
         # Run the performance tests
-        node performance-test.js
+        node performance-test.mjs
 
     - name: Compare with Baseline
       run: |
         echo "📈 Comparing performance with baseline..."
         
         # Create comparison script
-        cat > compare-performance.js << 'EOF'
-        const fs = require('fs');
+        cat > compare-performance.mjs << 'EOF'
+        import fs from 'fs';
         
         function comparePerformance() {
           let currentResults;
@@ -408,7 +408,7 @@ jobs:
         }
         EOF
         
-        node compare-performance.js
+        node compare-performance.mjs
 
     - name: Generate Performance Report
       run: |
@@ -424,21 +424,33 @@ jobs:
         
         EOF
         
-        # Add performance data
-        node -pe "
-        let results, comparison;
-        try { results = JSON.parse(require('fs').readFileSync('performance-results.json', 'utf8')); } catch(e) { results = {}; }
-        try { comparison = JSON.parse(require('fs').readFileSync('performance-comparison.json', 'utf8')); } catch(e) { comparison = {}; }
+        # Add performance data using jq
+        echo "| Metric | Value | Status |" >> performance-report.md
+        echo "|--------|-------|--------|" >> performance-report.md
         
-        let summary = \`| Metric | Value | Status |\n|--------|-------|--------|\n\`;
-        summary += \`| **Average Latency** | \${(comparison.summary?.avgLatency || 0).toFixed(2)}ms | \${(comparison.summary?.avgLatency || 0) < 500 ? '✅' : '❌'} |\n\`;
-        summary += \`| **Max Latency** | \${(comparison.summary?.maxLatency || 0).toFixed(2)}ms | \${(comparison.summary?.maxLatency || 0) < 2000 ? '✅' : '❌'} |\n\`;
-        summary += \`| **Error Rate** | \${(comparison.summary?.errorRate || 0).toFixed(2)}% | \${(comparison.summary?.errorRate || 0) < 5 ? '✅' : '❌'} |\n\`;
-        summary += \`| **Total Requests** | \${comparison.summary?.totalRequests || 0} | - |\n\`;
-        summary += \`| **Overall Status** | \${comparison.status || 'UNKNOWN'} | \${comparison.status === 'PASSED' ? '✅' : '❌'} |\n\`;
+        # Average Latency
+        AVG_LATENCY=$(jq -r '.summary.avgLatency // 0' performance-comparison.json 2>/dev/null || echo 0)
+        AVG_STATUS=$(echo "$AVG_LATENCY < 500" | bc -l | grep -q 1 && echo "✅" || echo "❌")
+        echo "| **Average Latency** | ${AVG_LATENCY}ms | $AVG_STATUS |" >> performance-report.md
         
-        console.log(summary);
-        " >> performance-report.md
+        # Max Latency
+        MAX_LATENCY=$(jq -r '.summary.maxLatency // 0' performance-comparison.json 2>/dev/null || echo 0)
+        MAX_STATUS=$(echo "$MAX_LATENCY < 2000" | bc -l | grep -q 1 && echo "✅" || echo "❌")
+        echo "| **Max Latency** | ${MAX_LATENCY}ms | $MAX_STATUS |" >> performance-report.md
+        
+        # Error Rate
+        ERROR_RATE=$(jq -r '.summary.errorRate // 0' performance-comparison.json 2>/dev/null || echo 0)
+        ERROR_STATUS=$(echo "$ERROR_RATE < 5" | bc -l | grep -q 1 && echo "✅" || echo "❌")
+        echo "| **Error Rate** | ${ERROR_RATE}% | $ERROR_STATUS |" >> performance-report.md
+        
+        # Total Requests
+        TOTAL_REQ=$(jq -r '.summary.totalRequests // 0' performance-comparison.json 2>/dev/null || echo 0)
+        echo "| **Total Requests** | $TOTAL_REQ | - |" >> performance-report.md
+        
+        # Overall Status
+        OVERALL_STATUS=$(jq -r '.status // "UNKNOWN"' performance-comparison.json 2>/dev/null || echo "UNKNOWN")
+        OVERALL_ICON=$([ "$OVERALL_STATUS" = "PASSED" ] && echo "✅" || echo "❌")
+        echo "| **Overall Status** | $OVERALL_STATUS | $OVERALL_ICON |" >> performance-report.md
         
         echo "" >> performance-report.md
         echo "## Performance Thresholds" >> performance-report.md
@@ -449,23 +461,12 @@ jobs:
         echo "" >> performance-report.md
         
         # Add violations if any
-        HAS_VIOLATIONS=$(node -pe "
-        try {
-          const comp = JSON.parse(require('fs').readFileSync('performance-comparison.json', 'utf8'));
-          console.log(comp.hasRegression);
-        } catch(e) {
-          console.log('false');
-        }")
+        HAS_VIOLATIONS=$(jq -r '.hasRegression // false' performance-comparison.json 2>/dev/null || echo "false")
         
         if [ "$HAS_VIOLATIONS" = "true" ]; then
           echo "## ⚠️ Performance Issues Detected" >> performance-report.md
           echo "" >> performance-report.md
-          node -pe "
-          try {
-            const comp = JSON.parse(require('fs').readFileSync('performance-comparison.json', 'utf8'));
-            comp.violations.forEach(v => console.log(\`- \${v.message}\`));
-          } catch(e) {}
-          " >> performance-report.md
+          jq -r '.violations[]? | "- " + .message' performance-comparison.json 2>/dev/null >> performance-report.md || true
           echo "" >> performance-report.md
         else
           echo "## ✅ Performance Acceptable" >> performance-report.md
@@ -503,7 +504,7 @@ jobs:
       uses: actions/github-script@v7
       with:
         script: |
-          const fs = require('fs');
+          import fs from 'fs';
           
           let comment = `## ⚡ Performance Benchmark Report\n\n`;
           

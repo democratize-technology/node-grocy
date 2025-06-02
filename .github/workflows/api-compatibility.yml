@@ -41,9 +41,9 @@ jobs:
         echo "🔍 Extracting current API surface from codebase..."
         
         # Create API extraction script
-        cat > extract-api.js << 'EOF'
-        const fs = require('fs');
-        const path = require('path');
+        cat > extract-api.mjs << 'EOF'
+        import fs from 'fs';
+        import path from 'path';
         
         // Extract exports from index.mjs
         function extractExports(filePath) {
@@ -113,7 +113,7 @@ jobs:
         console.log('API elements:', uniqueAPI.map(api => `${api.type}: ${api.name}`).join(', '));
         EOF
         
-        node extract-api.js
+        node extract-api.mjs
 
     - name: Get Base Branch API
       run: |
@@ -125,7 +125,7 @@ jobs:
         git checkout origin/${{ github.base_ref }}
         
         # Extract base API
-        node extract-api.js
+        node extract-api.mjs
         mv current-api.json base-api.json
         
         # Return to PR branch
@@ -139,8 +139,8 @@ jobs:
         echo "🔍 Comparing API compatibility..."
         
         # Create comparison script
-        cat > compare-api.js << 'EOF'
-        const fs = require('fs');
+        cat > compare-api.mjs << 'EOF'
+        import fs from 'fs';
         
         function loadAPI(file) {
           if (!fs.existsSync(file)) return [];
@@ -198,21 +198,21 @@ jobs:
         }
         EOF
         
-        node compare-api.js
+        node compare-api.mjs
 
     - name: Check for Breaking Changes
       run: |
         set -euo pipefail
         echo "🚨 Checking for breaking changes..."
         
-        # Read comparison results
-        BREAKING=$(node -pe "JSON.parse(require('fs').readFileSync('api-comparison.json', 'utf8')).breaking")
+        # Read comparison results  
+        BREAKING=$(jq -r '.breaking' api-comparison.json)
         
         if [ "$BREAKING" = "true" ]; then
           echo "❌ BREAKING CHANGES DETECTED!"
           echo ""
           echo "The following API elements have been removed:"
-          node -pe "JSON.parse(require('fs').readFileSync('api-comparison.json', 'utf8')).removed.map(api => '  - ' + api.type + ': ' + api.name).join('\n')"
+          jq -r '.removed[] | "  - " + .type + ": " + .name' api-comparison.json
           echo ""
           echo "This is a BREAKING CHANGE for v1.0.0 migration."
           echo "Either:"
@@ -243,15 +243,13 @@ jobs:
         EOF
         
         # Add summary from comparison
-        node -pe "
-        const data = JSON.parse(require('fs').readFileSync('api-comparison.json', 'utf8'));
-        let summary = \`| Metric | Count |\n|--------|-------|\n\`;
-        summary += \`| **Preserved API** | \${data.preserved.length} |\n\`;
-        summary += \`| **Added API** | \${data.added.length} |\n\`;
-        summary += \`| **Removed API** | \${data.removed.length} |\n\`;
-        summary += \`| **Breaking Changes** | \${data.breaking ? '❌ YES' : '✅ NO'} |\n\n\`;
-        console.log(summary);
-        " >> api-compatibility-report.md
+        echo "| Metric | Count |" >> api-compatibility-report.md
+        echo "|--------|-------|" >> api-compatibility-report.md
+        echo "| **Preserved API** | $(jq '.preserved | length' api-comparison.json) |" >> api-compatibility-report.md
+        echo "| **Added API** | $(jq '.added | length' api-comparison.json) |" >> api-compatibility-report.md
+        echo "| **Removed API** | $(jq '.removed | length' api-comparison.json) |" >> api-compatibility-report.md
+        echo "| **Breaking Changes** | $(jq -r 'if .breaking then "❌ YES" else "✅ NO" end' api-comparison.json) |" >> api-compatibility-report.md
+        echo "" >> api-compatibility-report.md
         
         # Add compatibility status
         if [ "${{ env.BREAKING_CHANGES }}" = "true" ]; then
@@ -270,20 +268,20 @@ jobs:
         echo "" >> api-compatibility-report.md
         
         # Add removed API section
-        REMOVED_COUNT=$(node -pe "JSON.parse(require('fs').readFileSync('api-comparison.json', 'utf8')).removed.length")
+        REMOVED_COUNT=$(jq '.removed | length' api-comparison.json)
         if [ $REMOVED_COUNT -gt 0 ]; then
           echo "### ❌ Removed API Elements" >> api-compatibility-report.md
           echo "" >> api-compatibility-report.md
-          node -pe "JSON.parse(require('fs').readFileSync('api-comparison.json', 'utf8')).removed.map(api => '- **' + api.type + '**: \`' + api.name + '\`').join('\n')" >> api-compatibility-report.md
+          jq -r '.removed[] | "- **" + .type + "**: `" + .name + "`"' api-comparison.json >> api-compatibility-report.md
           echo "" >> api-compatibility-report.md
         fi
         
         # Add new API section
-        ADDED_COUNT=$(node -pe "JSON.parse(require('fs').readFileSync('api-comparison.json', 'utf8')).added.length")
+        ADDED_COUNT=$(jq '.added | length' api-comparison.json)
         if [ $ADDED_COUNT -gt 0 ]; then
           echo "### ✅ Added API Elements" >> api-compatibility-report.md
           echo "" >> api-compatibility-report.md
-          node -pe "JSON.parse(require('fs').readFileSync('api-comparison.json', 'utf8')).added.map(api => '- **' + api.type + '**: \`' + api.name + '\`').join('\n')" >> api-compatibility-report.md
+          jq -r '.added[] | "- **" + .type + "**: `" + .name + "`"' api-comparison.json >> api-compatibility-report.md
           echo "" >> api-compatibility-report.md
         fi
         
@@ -331,7 +329,7 @@ jobs:
       uses: actions/github-script@v7
       with:
         script: |
-          const fs = require('fs');
+          import fs from 'fs';
           
           const data = JSON.parse(fs.readFileSync('api-comparison.json', 'utf8'));
           const breaking = '${{ env.BREAKING_CHANGES }}' === 'true';

@@ -114,9 +114,9 @@ jobs:
         echo "📖 Extracting API documentation from current JavaScript codebase..."
         
         # Create API extraction script
-        cat > extract-api-docs.js << 'EOF'
-        const fs = require('fs');
-        const path = require('path');
+        cat > extract-api-docs.mjs << 'EOF'
+        import fs from 'fs';
+        import path from 'path';
         
         function extractAPIDocumentation() {
           const apiDocs = {
@@ -246,7 +246,7 @@ jobs:
         console.log(`- Methods found: ${apiDocs.methods.length}`);
         EOF
         
-        node extract-api-docs.js
+        node extract-api-docs.mjs
 
     - name: Generate TypeScript Documentation
       timeout-minutes: 10
@@ -520,9 +520,9 @@ jobs:
       run: |
         echo "📊 Generating documentation statistics..."
         
-        cat > docs-stats.js << 'EOF'
-        const fs = require('fs');
-        const path = require('path');
+        cat > docs-stats.mjs << 'EOF'
+        import fs from 'fs';
+        import path from 'path';
         
         function analyzeDocumentation() {
           const stats = {
@@ -614,7 +614,7 @@ jobs:
         fs.writeFileSync('docs-statistics.json', JSON.stringify(stats, null, 2));
         EOF
         
-        node docs-stats.js
+        node docs-stats.mjs
 
     - name: Setup GitHub Pages
       if: github.ref == 'refs/heads/main'
@@ -646,7 +646,7 @@ jobs:
       uses: actions/github-script@v7
       with:
         script: |
-          const fs = require('fs');
+          import fs from 'fs';
           
           let comment = `## 📚 Documentation Generation Report\n\n`;
           
