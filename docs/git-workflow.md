@@ -1,17 +1,33 @@
 # Git Workflow for node-grocy v1.0.0 Development
 
 ## Critical Branch Structure Rules
+
+🚨 **NEVER FORCE PUSH TO `feature/v1-refactoring`** 🚨
+
 - **NEVER commit directly to `feature/v1-refactoring`** - this is the base branch for v1.0.0 work
+- **NEVER force push to any shared branch** - destroys git history and breaks collaboration
 - **ALWAYS create feature branches off of `feature/v1-refactoring`**
 - **ALWAYS target PRs back to `feature/v1-refactoring`** as the base branch
+- **ALWAYS go through PR review process** - no exceptions, even for "trivial" changes
 
 ## Correct Workflow Pattern
 1. `git checkout feature/v1-refactoring`
 2. `git checkout -b feature/descriptive-name` (create feature branch)
 3. Make changes and commit to feature branch
 4. `git push -u origin feature/descriptive-name`
-5. `gh pr create --base feature/v1-refactoring` (target the base branch)
-6. Add reviewer: `--reviewer democratize-technology-code-reviewer`
+5. `gh pr create --base feature/v1-refactoring --reviewer democratize-technology-code-reviewer`
+6. **Wait for review approval** - no exceptions
+7. Merge only after all GitHub Actions pass and reviewer approves
+
+## Absolutely Forbidden Actions
+- ❌ Direct commits to `feature/v1-refactoring`
+- ❌ Force pushing (`git push --force`) to any shared branch
+- ❌ Bypassing PR review process  
+- ❌ Merging without approval
+- ❌ "Quick fixes" directly to integration branch
+- ❌ Pushing broken code that fails GitHub Actions
+
+**Violation of these rules will result in branch protection enforcement and loss of direct push privileges.**
 
 ## Branch Hierarchy
 ```
