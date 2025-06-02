@@ -2,23 +2,24 @@ name: Node.js CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, feature/v1-refactoring ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, feature/v1-refactoring ]
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
 
     strategy:
       matrix:
         node-version: [20.x, 22.x]
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
@@ -26,5 +27,15 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
-    - name: Run tests
-      run: npm test
+    - name: Run tests with coverage
+      run: |
+        npm test
+        echo "Basic test run completed"
+
+    - name: Cache test results
+      uses: actions/cache@v4
+      with:
+        path: coverage/
+        key: coverage-${{ runner.os }}-${{ matrix.node-version }}-${{ github.sha }}
+        restore-keys: |
+          coverage-${{ runner.os }}-${{ matrix.node-version }}-
