@@ -196,7 +196,7 @@ jobs:
           const files = ['src', '.'].flatMap(dir => {
             if (!fs.existsSync(dir)) return [];
             return fs.readdirSync(dir, { recursive: true })
-              .filter(f => typeof f === 'string' && (f.endsWith('.ts') || f.endsWith('.js') || f.endsWith('.mjs')))
+              .filter(f => (f.endsWith('.ts') || f.endsWith('.js') || f.endsWith('.mjs')))
               .map(f => dir === '.' ? f : `${dir}/${f}`);
           });
           

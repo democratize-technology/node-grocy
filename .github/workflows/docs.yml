@@ -65,7 +65,7 @@ jobs:
           "excludeExternals": true,
           "readme": "README.md",
           "name": "node-grocy v1.0.0 API Documentation",
-          "tsconfig": "tsconfig.json",
+          "tsconfig": "tsconfig.docs.json",
           "plugin": ["@typedoc/plugin-markdown"],
           "gitRevision": "feature/v1-refactoring",
           "categorizeByGroup": true,
@@ -256,10 +256,9 @@ jobs:
         if find src -name "*.ts" 2>/dev/null | grep -q .; then
           echo "TypeScript files found, generating TypeDoc documentation..."
           
-          # Generate TypeScript configuration if it doesn't exist
-          if [ ! -f "tsconfig.json" ]; then
-            echo "Creating tsconfig.json for documentation..."
-            cat > tsconfig.json << 'EOF'
+          # Generate TypeScript configuration for documentation
+          echo "Creating tsconfig.docs.json for documentation..."
+          cat > tsconfig.docs.json << 'EOF'
         {
           "compilerOptions": {
             "target": "ES2022",
@@ -616,17 +615,17 @@ jobs:
         node docs-stats.js
 
     - name: Setup GitHub Pages
-      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/v1-refactoring'
+      if: github.ref == 'refs/heads/main'
       uses: actions/configure-pages@v4
 
     - name: Upload to GitHub Pages
-      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/v1-refactoring'
+      if: github.ref == 'refs/heads/main'
       uses: actions/upload-pages-artifact@v3
       with:
         path: ./docs
 
     - name: Deploy to GitHub Pages
-      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/v1-refactoring'
+      if: github.ref == 'refs/heads/main'
       id: deployment
       uses: actions/deploy-pages@v4
 
