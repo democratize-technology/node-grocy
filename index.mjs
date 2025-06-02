@@ -63,16 +63,17 @@ function validateNumber(value, fieldName, options = {}) {
 function validateString(value, fieldName, options = {}) {
   const { required = true, maxLength = 255, minLength } = Object.freeze(options);
 
-  if (required && (!value || typeof value !== 'string' || !value.trim())) {
+  // Check type first
+  if (value !== null && value !== undefined && typeof value !== 'string') {
+    throw Object.freeze(new Error(`${fieldName} must be a string`));
+  }
+
+  if (required && (!value || !value.trim())) {
     throw Object.freeze(new Error(`${fieldName} is required and must be non-empty`));
   }
 
   if (!required && !value) {
     return value || '';
-  }
-
-  if (typeof value !== 'string') {
-    throw Object.freeze(new Error(`${fieldName} must be a string`));
   }
 
   const trimmedLength = value.trim().length;
@@ -1041,16 +1042,16 @@ export default class Grocy {
    * @returns {Promise<Object>} - Success status
    */
   async uploadFile(group, fileName, fileData) {
-    if (!this.apiKey) {
-      throw Object.freeze(new Error('API key is required. Use setApiKey() to set it.'));
-    }
-
-    // Validate inputs
+    // Validate inputs first before checking API key
     group = validateString(group, 'File group', { minLength: 1, maxLength: 100 });
     fileName = validateString(fileName, 'File name', { minLength: 1, maxLength: 255 });
 
     if (!fileData) {
       throw Object.freeze(new Error('File data is required'));
+    }
+
+    if (!this.apiKey) {
+      throw Object.freeze(new Error('API key is required. Use setApiKey() to set it.'));
     }
 
     const url = new URL(`${this.baseUrl}/files/${group}/${fileName}`);

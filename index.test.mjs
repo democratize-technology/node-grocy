@@ -1140,3 +1140,284 @@ test('Calendar methods', async (t) => {
     getCalendarSharingLinkFetchMock.mock.calls[0].arguments[0].toString();
   assert.strictEqual(getCalendarSharingLinkUrl, `${BASE_URL}/api/calendar/ical/sharing-link`);
 });
+
+// Validation function tests
+test('Validation functions', async (t) => {
+  const client = new Grocy(BASE_URL, API_KEY);
+
+  // Test constructor validation
+  assert.throws(() => new Grocy(''), { message: 'Base URL is required and must be non-empty' });
+  assert.throws(() => new Grocy(null), { message: 'Base URL is required and must be non-empty' });
+  assert.throws(() => new Grocy(123), { message: 'Base URL must be a string' });
+  // Empty string is allowed for API key in constructor (it's optional)
+  const clientNoKey = new Grocy(BASE_URL, '');
+  assert.strictEqual(clientNoKey.apiKey, null); // Empty string becomes null for optional strings
+  assert.throws(() => new Grocy(BASE_URL, 123), { message: 'API key must be a string' });
+
+  // Test setApiKey validation
+  const testClient = new Grocy(BASE_URL, API_KEY);
+  testClient.setApiKey(''); // Empty string is allowed
+  assert.strictEqual(testClient.apiKey, null); // Empty string becomes null for optional strings
+  assert.throws(() => testClient.setApiKey(123), { message: 'API key must be a string' });
+
+  // Test ID validation
+  await assert.rejects(() => client.getProductDetails('abc'), {
+    message: 'Product ID must be a positive integer',
+  });
+  await assert.rejects(() => client.getProductDetails(0), {
+    message: 'Product ID must be a positive integer',
+  });
+  await assert.rejects(() => client.getProductDetails(-1), {
+    message: 'Product ID must be a positive integer',
+  });
+  await assert.rejects(() => client.getProductDetails(1.5), {
+    message: 'Product ID must be a positive integer',
+  });
+
+  // Test string validation
+  await assert.rejects(() => client.getProductByBarcode(''), {
+    message: 'Barcode is required and must be non-empty',
+  });
+  await assert.rejects(() => client.getProductByBarcode(123), {
+    message: 'Barcode must be a string',
+  });
+  await assert.rejects(() => client.getProductByBarcode('   '), {
+    message: 'Barcode is required and must be non-empty',
+  });
+
+  // Test number validation
+  await assert.rejects(() => client.addProductToStock(1, { amount: 'abc' }), {
+    message: 'Amount must be a valid number',
+  });
+  await assert.rejects(() => client.addProductToStock(1, { amount: -1 }), {
+    message: 'Amount must be at least 0.001',
+  });
+  await assert.rejects(() => client.getVolatileStock('abc'), {
+    message: 'Due soon days must be a valid number',
+  });
+  await assert.rejects(() => client.getVolatileStock(-1), {
+    message: 'Due soon days must be at least 0',
+  });
+  await assert.rejects(() => client.getVolatileStock(400), {
+    message: 'Due soon days must be at most 365',
+  });
+
+  // Test date validation
+  await assert.rejects(
+    () =>
+      client.addProductToStock(1, {
+        amount: 1,
+        best_before_date: 'invalid-date',
+      }),
+    {
+      message: 'Best before date is not a valid date',
+    }
+  );
+
+  // Test boolean validation
+  await assert.rejects(
+    () =>
+      client.consumeProduct(1, {
+        amount: 1,
+        spoiled: 'yes',
+      }),
+    {
+      message: 'Spoiled must be a boolean',
+    }
+  );
+
+  // Test array validation
+  await assert.rejects(
+    () =>
+      client.addRecipeProductsToShoppingList(1, {
+        excluded_product_ids: 'not-an-array',
+      }),
+    {
+      message: 'Excluded product IDs must be an array',
+    }
+  );
+  await assert.rejects(
+    () =>
+      client.addRecipeProductsToShoppingList(1, {
+        excluded_product_ids: [1, 'abc', 3],
+      }),
+    {
+      message: 'Product ID must be a positive integer',
+    }
+  );
+
+  // Test file validation
+  await assert.rejects(() => client.getFile('', 'test.jpg'), {
+    message: 'File group is required and must be non-empty',
+  });
+  await assert.rejects(() => client.getFile('group', ''), {
+    message: 'File name is required and must be non-empty',
+  });
+
+  // uploadFile validates parameters first, then API key
+  const clientNoApiKey = new Grocy(BASE_URL);
+  await assert.rejects(() => clientNoApiKey.uploadFile('', 'test.jpg', new Uint8Array()), {
+    message: 'File group is required and must be non-empty',
+  });
+
+  // Test API key validation with valid parameters
+  await assert.rejects(() => clientNoApiKey.uploadFile('group', 'test.jpg', new Uint8Array()), {
+    message: 'API key is required. Use setApiKey() to set it.',
+  });
+
+  // With API key, parameter validation works
+  await assert.rejects(() => client.uploadFile('', 'test.jpg', new Uint8Array()), {
+    message: 'File group is required and must be non-empty',
+  });
+  await assert.rejects(() => client.uploadFile('group', '', new Uint8Array()), {
+    message: 'File name is required and must be non-empty',
+  });
+  await assert.rejects(() => client.uploadFile('group', 'test.jpg', null), {
+    message: 'File data is required',
+  });
+
+  // Test user validation
+  await assert.rejects(() => client.createUser(null), {
+    message: 'User data must be a non-null object',
+  });
+  await assert.rejects(() => client.createUser({}), {
+    message: 'Username is required and must be non-empty',
+  });
+  await assert.rejects(() => client.createUser({ username: 'test' }), {
+    message: 'Password is required and must be non-empty',
+  });
+  await assert.rejects(() => client.editUser('abc', {}), {
+    message: 'User ID must be a positive integer',
+  });
+
+  // Test entity validation
+  await assert.rejects(() => client.getObjects(''), {
+    message: 'Entity name is required and must be non-empty',
+  });
+  await assert.rejects(() => client.addObject('', {}), {
+    message: 'Entity name is required and must be non-empty',
+  });
+  await assert.rejects(() => client.addObject('products', null), {
+    message: 'Entity data must be a non-null object',
+  });
+
+  // Test optional parameter validation
+  const mockResponse = createMockResponse(200, []);
+
+  // Test with valid optional parameters
+  const fetchMock1 = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.addProductToStock(1, { amount: 1, price: null, location_id: undefined });
+  assert.strictEqual(fetchMock1.mock.calls.length, 1);
+
+  // Test optional string validation
+  const fetchMock2 = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.setUserSetting('key', { value: null });
+  assert.strictEqual(fetchMock2.mock.calls.length, 1);
+
+  // Test validation with valid Date object
+  const fetchMock3 = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.executeChore(1, { tracked_time: new Date('2023-01-01') });
+  assert.strictEqual(fetchMock3.mock.calls.length, 1);
+
+  // Test string validation with valid non-required empty string
+  const entity = 'products';
+  await assert.rejects(() => client.getUserfields(entity, ''), {
+    message: 'Object ID is required and must be non-empty',
+  });
+
+  // Test getUserfields with string objectId
+  const fetchMock4 = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.getUserfields(entity, 'string-id');
+  assert.strictEqual(fetchMock4.mock.calls.length, 1);
+
+  // Test max length validation
+  const longString = 'a'.repeat(256);
+  await assert.rejects(() => client.getProductByBarcode(longString), {
+    message: 'Barcode must not exceed 200 characters',
+  });
+
+  // Test min length validation
+  await assert.rejects(() => client.getUserSetting(''), {
+    message: 'Setting key is required and must be non-empty',
+  });
+
+  // Test setUserSetting with null data
+  await assert.rejects(() => client.setUserSetting('key', null), {
+    message: 'Setting data must be a non-null object',
+  });
+
+  // Test other validation error paths
+  await assert.rejects(() => client.addProductToStock(1, { amount: NaN }), {
+    message: 'Amount must be a valid number',
+  });
+
+  // Test validateDate with non-string non-Date value
+  await assert.rejects(
+    () =>
+      client.addProductToStock(1, {
+        amount: 1,
+        best_before_date: 123,
+      }),
+    {
+      message: 'Best before date must be a Date object or date string',
+    }
+  );
+
+  // Test validateOptionalString with string
+  const fetchMock5 = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.addProductToStock(1, { amount: 1, transaction_type: 'purchase' });
+  assert.strictEqual(fetchMock5.mock.calls.length, 1);
+
+  // Test validateArray with empty array
+  const fetchMock6 = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.addRecipeProductsToShoppingList(1, { excluded_product_ids: [] });
+  assert.strictEqual(fetchMock6.mock.calls.length, 1);
+
+  // Test optional array not provided
+  const fetchMock7 = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.addRecipeProductsToShoppingList(1, {});
+  assert.strictEqual(fetchMock7.mock.calls.length, 1);
+
+  // Test more validation edge cases
+  await assert.rejects(() => client.deleteUser(0), {
+    message: 'User ID must be a positive integer',
+  });
+
+  await assert.rejects(() => client.deleteFile(123, 'test.jpg'), {
+    message: 'File group must be a string',
+  });
+
+  await assert.rejects(() => client.deleteFile('group', 123), {
+    message: 'File name must be a string',
+  });
+
+  // Test string with minLength - 'a' is valid since minLength is 1
+  // This test was incorrect - removing it since username 'a' is actually valid
+
+  // Actually, let's test an actual case where minLength would fail - empty string with required: false
+  await assert.rejects(() => client.editUser(1, { username: '' }), {
+    message: 'Username is required and must be non-empty',
+  });
+
+  // Test more validateOptionalNumber cases
+  const fetchMock8 = t.mock.method(global, 'fetch', () => Promise.resolve(mockResponse));
+  await client.addProductToStock(1, { amount: 1, price: 0 }); // 0 is valid
+  assert.strictEqual(fetchMock8.mock.calls.length, 1);
+
+  // Test string not a string when required is false
+  const longGroupName = 'a'.repeat(101);
+  await assert.rejects(() => client.getFile(longGroupName, 'test.jpg'), {
+    message: 'File group must not exceed 100 characters',
+  });
+
+  // Test undoTask for more coverage
+  await assert.rejects(() => client.undoTask('not-a-number'), {
+    message: 'Task ID must be a positive integer',
+  });
+
+  // Test error path in request when no API key
+  const clientNoApiKey2 = new Grocy(BASE_URL);
+  await assert.rejects(() => clientNoApiKey2.addProductToStock(1, { amount: 1 }), {
+    message: 'API key is required. Use setApiKey() to set it.',
+  });
+});
