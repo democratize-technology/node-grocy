@@ -1,14 +1,18 @@
+#!/bin/sh
 echo "🔍 Running pre-commit checks..."
 
 # Run lint-staged first (linting and formatting)
 echo "🧹 Linting and formatting staged files..."
 npx lint-staged
+LINT_EXIT_CODE=$?
 
 # If lint-staged succeeds, run tests
-if [ $? -eq 0 ]; then
+if [ $LINT_EXIT_CODE -eq 0 ]; then
   echo "🧪 Running tests..."
   npm test
-  if [ $? -ne 0 ]; then
+  TEST_EXIT_CODE=$?
+  
+  if [ $TEST_EXIT_CODE -ne 0 ]; then
     echo "❌ Tests failed! Please fix tests before committing."
     echo "💡 Use 'git commit --no-verify' to bypass hooks in emergencies."
     exit 1
