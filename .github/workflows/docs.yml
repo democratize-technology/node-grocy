@@ -283,7 +283,6 @@ jobs:
           ]
         }
         EOF
-          fi
           
           # Generate TypeDoc documentation
           npx typedoc || echo "TypeDoc generation completed with warnings"
